@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>DriveLegal — On-device AI</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --black:#000;--navy:#050d1f;--navyMid:#0a1628;--navyLight:#0f2040;--navyBorder:#1a3a6b;
+    --blue:#1a4fa8;--blueVibrant:#2563eb;--blueLight:#3b82f6;--bluePale:#60a5fa;
+    --white:#fff;--grayLight:#c8d3e8;--gray:#8899bb;--accent:#06b6d4;--textSecondary:#c8d3e8;
+    --surfaceRaised:#0f2040;--radLg:16px;--radXl:20px;--radMd:12px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{background:linear-gradient(180deg,#000 0%,#050d1f 42%,#0a1628 100%);color:var(--textSecondary);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
+  #app{display:flex;flex-direction:column;height:100dvh;max-width:760px;margin:0 auto}
+
+  header{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 14px) 12px 12px;
+    background:var(--navyMid);border-bottom:1px solid var(--navyBorder)}
+  .logo{width:34px;height:34px;border-radius:11px;flex:none;background:linear-gradient(135deg,#3b82f6,#2563eb,#1a4fa8);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;box-shadow:0 0 16px rgba(37,99,235,.45)}
+  .hc{flex:1;min-width:0}.htitle{font-size:15px;font-weight:700;color:var(--white)}
+  .hsub{font-size:11px;color:var(--gray);margin-top:1px}
+  .badge{font-size:10px;font-weight:700;padding:5px 9px;border-radius:999px;border:1px solid var(--navyBorder);
+    color:var(--gray);background:var(--navyMid);white-space:nowrap}
+  .badge.on{color:#34d399;border-color:#1c5136}.badge.load{color:#fbbf24;border-color:#4a3a12}
+
+  /* context bar: location pill + vehicle + model */
+  .ctx{display:flex;gap:8px;padding:10px 12px;background:var(--navy);border-bottom:1px solid var(--navyBorder);flex-wrap:wrap;align-items:center}
+  .locpill{display:flex;align-items:center;gap:6px;flex:1;min-width:150px;background:var(--navyMid);
+    border:1px solid var(--navyBorder);border-radius:var(--radMd);padding:8px 11px;color:var(--bluePale);font-size:12.5px;font-weight:600}
+  .locpill .m{color:var(--gray);font-weight:500}
+  .locpill:after{content:"⌄";margin-left:auto;color:var(--gray)}
+  select{background:var(--navyMid);color:var(--white);border:1px solid var(--navyBorder);
+    border-radius:var(--radMd);padding:9px 10px;font-size:12px}
+  #vehicle{flex:1;min-width:120px}#model{flex:1;min-width:120px}
+  .prog{height:6px;background:#0a1428;border-radius:999px;overflow:hidden;margin:8px 12px 0;display:none}
+  .prog.show{display:block}.prog>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3b82f6,#06b6d4);transition:width .3s}
+  .progtxt{font-size:10.5px;color:var(--gray);margin:5px 12px 0;min-height:13px}
+
+  #log{flex:1;overflow-y:auto;padding:14px 0}
+  .row{display:flex;padding:4px 16px;gap:8px}.row.user{justify-content:flex-end}.row.bot{justify-content:flex-start}
+  .avatar{width:32px;height:32px;border-radius:999px;flex:none;margin-top:2px;background:linear-gradient(135deg,#3b82f6,#1a4fa8);
+    border:1.5px solid #2f6df0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px}
+  .group{max-width:85%;display:flex;flex-direction:column;gap:8px}
+  .bubble{border-radius:var(--radLg);font-size:15px;line-height:1.55;padding:12px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+  .bubble.bot{background:var(--surfaceRaised);border:1px solid var(--navyBorder);color:var(--textSecondary);border-bottom-left-radius:4px}
+  .bubble.user{background:linear-gradient(135deg,#2f6df0,#2563eb,#1d4ed8);color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .bubble b{color:#fff;font-weight:700}
+  .ttsbtn{margin-top:6px;background:none;border:none;color:var(--bluePale);font-size:12px;padding:0;cursor:pointer}
+  .row.sys{justify-content:center}
+  .sysmsg{font-size:12px;color:var(--gray);border:1px dashed var(--navyBorder);border-radius:12px;padding:8px 12px;text-align:center;max-width:88%}
+  .dots{display:inline-flex;gap:5px;padding:4px 2px}
+  .dots i{width:7px;height:7px;border-radius:50%;background:var(--bluePale);animation:b 1.2s infinite}
+  .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+  @keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}
+
+  .fcard{border:1px solid rgba(6,182,212,.25);border-radius:var(--radXl);overflow:hidden;
+    background:linear-gradient(160deg,#050d1f,#0a1628,#0f2040);box-shadow:0 4px 12px rgba(37,99,235,.15)}
+  .fhead{display:flex;gap:12px;padding:16px}
+  .ficon{width:34px;height:34px;border-radius:var(--radMd);flex:none;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#3b82f6,#2563eb,#1a4fa8);color:#fff;font-size:16px}
+  .fname{font-size:17px;font-weight:700;color:#fff;line-height:1.3}.fsec{font-size:13px;color:var(--accent);margin-top:2px}
+  .floc{font-size:13px;color:var(--grayLight);padding:0 16px 12px}
+  .fdiv{height:1px;background:var(--navyBorder);margin:0 16px}
+  .fdet{padding:16px;display:flex;flex-direction:column;gap:9px}
+  .fdt{font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+  .frow{display:flex;justify-content:space-between;align-items:center}
+  .frow .l{font-size:13px;color:var(--grayLight)}.frow .v{font-size:15px;font-weight:600;color:var(--grayLight)}
+  .frow .v.hi{font-size:20px;font-weight:800;color:var(--accent)}
+
+  footer{padding:10px 12px calc(env(safe-area-inset-bottom) + 12px);background:var(--navyMid);
+    border-top:1px solid var(--navyBorder);display:flex;gap:8px;align-items:flex-end}
+  #q{flex:1;background:var(--navyMid);border:1px solid var(--navyBorder);border-radius:var(--radLg);color:#fff;padding:12px;font-size:15px;outline:none;line-height:1.5}
+  #q:focus{border-color:var(--blueVibrant)}
+  #send{width:46px;height:46px;border:none;border-radius:var(--radLg);flex:none;color:#fff;font-size:20px;
+    background:linear-gradient(135deg,#3b82f6,#2563eb,#1a4fa8);display:flex;align-items:center;justify-content:center}
+  #send:disabled{opacity:.4}
+
+  /* Location sheet (mirrors the app's LocationModal: GPS / Map / Manual) */
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;z-index:50}
+  .sheet.show{display:flex}
+  .sheetbody{width:100%;max-width:760px;background:var(--navyMid);border-top-left-radius:22px;border-top-right-radius:22px;
+    border:1px solid var(--navyBorder);border-bottom:none;padding:16px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px)}
+  .sheettitle{display:flex;align-items:center;margin-bottom:12px}
+  .sheettitle b{font-size:16px;color:#fff}.sheettitle .x{margin-left:auto;color:var(--gray);font-size:20px;background:none;border:none}
+  .tabs{display:flex;gap:8px;margin-bottom:14px}
+  .tab{flex:1;padding:9px;border-radius:var(--radMd);border:1px solid var(--navyBorder);background:var(--navy);color:var(--gray);font-size:13px;font-weight:600}
+  .tab.active{background:linear-gradient(135deg,#2563eb,#1a4fa8);color:#fff;border-color:transparent}
+  .pane{display:none}.pane.show{display:block}
+  .btn{width:100%;padding:13px;border-radius:var(--radLg);border:none;color:#fff;font-size:15px;font-weight:700;
+    background:linear-gradient(135deg,#3b82f6,#2563eb,#1a4fa8);margin-top:10px}
+  .btn.sec{background:var(--navy);border:1px solid var(--navyBorder);color:var(--grayLight)}
+  .fld{width:100%;margin-bottom:10px}
+  #map{height:240px;border-radius:var(--radLg);overflow:hidden;border:1px solid var(--navyBorder)}
+  .maphint{font-size:12px;color:var(--gray);margin:8px 0}
+  .leaflet-container{background:#0a1628}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">DL</div>
+    <div class="hc"><div class="htitle">DriveLegal</div><div class="hsub">On-device AI · offline</div></div>
+    <div id="badge" class="badge load">starting…</div>
+  </header>
+
+  <div class="ctx">
+    <div class="locpill" id="locpill"><span>📍</span><span id="loctext" class="m">Set location</span></div>
+    <select id="vehicle" title="Vehicle">
+      <option value="two_wheeler">Bike / scooter</option>
+      <option value="three_wheeler">Auto</option>
+      <option value="four_wheeler">Car</option>
+    </select>
+    <select id="model" title="Model">
+      <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" selected>Llama-3.2-1B</option>
+      <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B (light)</option>
+      <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen2.5-1.5B (quality)</option>
+    </select>
+  </div>
+  <div id="prog" class="prog"><i id="progbar"></i></div>
+  <div id="progtxt" class="progtxt"></div>
+
+  <div id="log"></div>
+
+  <footer>
+    <input id="q" placeholder="Ask about a fine, rule, or accident…" autocomplete="off" />
+    <button id="send" disabled>➤</button>
+  </footer>
+</div>
+
+<!-- Location sheet -->
+<div class="sheet" id="sheet">
+  <div class="sheetbody">
+    <div class="sheettitle"><b>Set your location</b><button class="x" id="sheetx">✕</button></div>
+    <div class="tabs">
+      <button class="tab active" data-tab="gps">📍 GPS</button>
+      <button class="tab" data-tab="map">🗺️ Map</button>
+      <button class="tab" data-tab="manual">📋 Manual</button>
+    </div>
+    <div class="pane show" data-pane="gps">
+      <p class="maphint">Uses your device GPS to find the nearest city. Works offline.</p>
+      <button class="btn" id="gpsBtn">Use my current location</button>
+      <div id="gpsResult" class="maphint"></div>
+    </div>
+    <div class="pane" data-pane="map">
+      <p class="maphint">Tap anywhere on the map to drop a pin. (Map tiles need internet; the pin→city lookup is offline.)</p>
+      <div id="map"></div>
+      <div id="mapResult" class="maphint"></div>
+      <button class="btn" id="mapUse" disabled>Use this location</button>
+    </div>
+    <div class="pane" data-pane="manual">
+      <select id="state" class="fld"></select>
+      <select id="city" class="fld"></select>
+      <button class="btn" id="manualUse">Set location</button>
+    </div>
+  </div>
+</div>
+
+<script src="/offline.bundle.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const log=$('log'),badge=$('badge'),prog=$('prog'),progbar=$('progbar'),progtxt=$('progtxt');
+  let engine=null,modelReady=false,busy=false,LOC=null,map=null,mapMarker=null,pendingPin=null;
+  let loc={state_code:null,city_code:null,city_name:null};
+
+  // ── Location data + helpers ───────────────────────────────────────────────
+  function haversine(a,b,c,d){const R=6371,r=Math.PI/180;
+    const dl=(c-a)*r,dn=(d-b)*r;const x=Math.sin(dl/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(dn/2)**2;
+    return R*2*Math.asin(Math.sqrt(x));}
+  function nearestCity(lat,lng){let best=null,bd=1e9;
+    for(const ci of LOC.cities){const d=haversine(lat,lng,ci.lat,ci.lng);if(d<bd){bd=d;best=ci;}}return best;}
+  function setLoc(ci){ if(!ci) return; loc={state_code:ci.s,city_code:ci.c,city_name:ci.n};
+    $('loctext').textContent=`${ci.n}, ${ci.s}`; $('loctext').classList.remove('m'); }
+  function populateStates(){ const sel=$('state'); sel.innerHTML='<option value="">Select state…</option>';
+    LOC.states.forEach(([c,n])=>{const o=document.createElement('option');o.value=c;o.textContent=n;sel.appendChild(o);}); }
+  function populateCities(stateCode){ const sel=$('city'); sel.innerHTML='<option value="">Select city…</option>';
+    LOC.cities.filter(c=>c.s===stateCode).forEach(c=>{const o=document.createElement('option');o.value=c.c;o.textContent=c.n;sel.appendChild(o);}); }
+
+  function session(){ return {state_code:loc.state_code,city_code:loc.city_code,city_name:loc.city_name,
+    vehicle_segment:$('vehicle').value,road_bucket:'main_road',violation_code:null}; }
+
+  // ── Chat rendering (mirrors ChatBubble + FineCard) ────────────────────────
+  const esc=(s)=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const bold=(s)=>esc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  const scroll=()=>{log.scrollTop=log.scrollHeight;};
+  function sysMsg(t){const r=document.createElement('div');r.className='row sys';r.innerHTML=`<div class="sysmsg">${esc(t)}</div>`;log.appendChild(r);scroll();}
+  function userMsg(t){const r=document.createElement('div');r.className='row user';r.innerHTML=`<div class="group"><div class="bubble user">${esc(t)}</div></div>`;log.appendChild(r);scroll();}
+  function botRow(){const r=document.createElement('div');r.className='row bot';
+    r.innerHTML=`<div class="avatar">DL</div><div class="group"><div class="bubble bot"><span class="dots"><i></i><i></i><i></i></span></div></div>`;
+    log.appendChild(r);scroll();return{bubble:r.querySelector('.bubble'),group:r.querySelector('.group')};}
+  function speak(text){ try{const u=new SpeechSynthesisUtterance(text.replace(/[*#₹]/g,'').slice(0,600));
+    u.lang='en-IN';u.rate=.98;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){} }
+  function addTts(bubble,text){ if(!('speechSynthesis'in window))return; const b=document.createElement('button');
+    b.className='ttsbtn';b.textContent='🔊 Listen';b.onclick=()=>speak(text);bubble.appendChild(document.createElement('br'));bubble.appendChild(b); }
+  function fineCardHTML(c){const rupee=(v)=>v==null?'—':'₹'+Number(v).toLocaleString('en-IN');const sec=c.section||c.mv_section;
+    let rows=`<div class="frow"><span class="l">First Offence</span><span class="v hi">${rupee(c.fine_first)}</span></div>`;
+    if(c.fine_repeat!=null)rows+=`<div class="frow"><span class="l">Repeat Offence</span><span class="v">${rupee(c.fine_repeat)}</span></div>`;
+    if(c.imprisonment)rows+=`<div class="frow"><span class="l">Imprisonment</span><span class="v">${esc(String(c.imprisonment))}</span></div>`;
+    rows+=`<div class="frow"><span class="l">Compoundable</span><span class="v">${c.compoundable?'Yes':'No'}</span></div>`;
+    const l=[c.city_name,c.state_code].filter(Boolean).join(', ');
+    return `<div class="fcard"><div class="fhead"><div class="ficon">⚖️</div><div>
+      <div class="fname">${esc(c.violation_name||c.violation_code)}</div>${sec?`<div class="fsec">Section ${esc(String(sec))}</div>`:''}</div></div>
+      ${l?`<div class="floc">📍 ${esc(l)}</div>`:''}<div class="fdiv"></div>
+      <div class="fdet"><div class="fdt">Details</div>${rows}</div></div>`;}
+
+  // ── Model (lazy import so the UI never breaks if the CDN is slow/blocked) ──
+  async function loadModel(){
+    if(!navigator.gpu){badge.textContent='offline rules';badge.className='badge on';
+      sysMsg("This browser has no WebGPU, so I'm answering with the built-in rule engine — still fully offline and exact.");
+      $('send').disabled=false;return;}
+    const modelId=$('model').value;prog.classList.add('show');badge.textContent='loading model…';badge.className='badge load';$('send').disabled=true;
+    try{
+      // Self-hosted so the on-device model survives a fully-offline reload
+      // (the CDN import broke offline; weights/wasm are already cached by WebLLM).
+      const webllm=await import('/webllm.bundle.js');
+      engine=await webllm.CreateMLCEngine(modelId,{initProgressCallback:(r)=>{progtxt.textContent=r.text||'';
+        if(typeof r.progress==='number')progbar.style.width=Math.round(r.progress*100)+'%';}});
+      modelReady=true;
+      DriveLegalOffline.setOnDeviceLLM({isReady:()=>modelReady,generate:async(prompt,opts)=>{
+        const out=await engine.chat.completions.create({messages:[{role:'user',content:prompt}],
+          temperature:(opts&&opts.temperature)??0.3,max_tokens:(opts&&opts.maxTokens)??200});
+        return out.choices?.[0]?.message?.content||'';}});
+      prog.classList.remove('show');progtxt.textContent='';badge.textContent='on-device AI';badge.className='badge on';
+      sysMsg('Model ready — running fully on your device. You can turn off Wi-Fi now.');
+    }catch(e){console.error(e);prog.classList.remove('show');badge.textContent='offline rules';badge.className='badge on';
+      sysMsg('Could not start the on-device model here — using the built-in rule engine (still offline and exact).');}
+    $('send').disabled=false;
+  }
+
+  // ══ Conversational scaffolding — parity with modes 1 & 2 ════════════════════
+  let chatHistory=[];          // Tier 1: rolling {role,content} memory
+  let lastCard=null;           // Tier 1: last violation card, for follow-ups w/o the model
+  let pendingClarify=false;    // Tier 3: waiting for a helmet-vs-seatbelt vehicle answer
+  const respCache=new Map();   // Tier 2: repeated-query cache
+
+  // Tier 1 — safety guardrail (ported from dynamic_chatbot.guardrail_response).
+  // Refuses bribery / evasion / forgery BEFORE the model ever runs.
+  const UNSAFE_RE=/\b(bribe|bribing|ghoos|ghus|rishwat|fake\s+(licen[cs]e|rc|puc|number\s*plate|plate|insurance|challan)|forged?\s+(licen[cs]e|rc|puc|document|plate)|duplicate\s+(number\s*plate|plate)|(avoid|escape|evade|dodge|get\s+out\s+of|wriggle\s+out\s+of)\s+(the\s+)?(fine|challan|chalan|penalty|cop|police|checkpost|check\s*post|rto)|how\s+(to|do\s+i)\s+(not\s+)?(get\s+)?(caught|fined|challan))\b/i;
+  const UNSAFE_REPLY="I hear you — fines are frustrating. But I can't help with avoiding, evading, or 'managing' a challan, or with fake documents. That's a separate offence and can land you in bigger trouble. What I *can* do: explain the rule, the correct fine, how to pay or contest it legally, and how to avoid it next time.";
+
+  // Tier 2 — out-of-scope guard: only send traffic-law queries to the model.
+  const TRAFFIC_RE=/\b(fine|challan|penalt|helmet|seat\s?belt|licen[cs]e|dl|rc|puc|insurance|speed|signal|red\s?light|drunk|drink|accident|traffic|rule|road|vehicle|bike|car|scooter|auto|truck|bus|overload|parking|lane|zebra|pedestrian|section|mv\s?act|rto|police|pollution|registration|wrong\s?side|triple|phone|mobile|tint|plate|toll|emission|driv|offence|offense)\b/i;
+  const FOLLOWUP_RE=/\b(it|that|this|compoundable|repeat|again|more|explain|why|section|imprison|jail|how much|what about|and|also|instead|pay|contest|avoid|court)\b/i;
+  // A NEW violation subject means it's a fresh query, not a follow-up. If the
+  // text names any of these, we trust the resolver; otherwise a follow-up phrase
+  // stays anchored to the last card (prevents "repeat offence" → wrong match).
+  const NEW_TOPIC_RE=/\b(helmet|seat\s?belt|signal|red\s?light|jump|speed|over\s?speed|drunk|drink|alcohol|licen[cs]e|\bdl\b|insurance|puc|pollution|registration|\brc\b|wrong\s?side|triple|phone|mobile|texting|parking|lane|zebra|pedestrian|overload|goods|tint|number\s?plate|hit|run|accident|minor|underage|racing|stunt|wheelie|silencer|horn|honk|ambulance|fitness|permit|toll|emission|tax|document|papers?)\b/i;
+  function isOutOfScope(text){
+    if(TRAFFIC_RE.test(text))return false;
+    if(chatHistory.length&&FOLLOWUP_RE.test(text))return false;   // in-context follow-up
+    return text.trim().split(/\s+/).length>=3;
+  }
+
+  const cacheKey=(t)=>`${loc.state_code}|${$('vehicle').value}|${t.toLowerCase().replace(/\s+/g,' ').trim()}`;
+
+  const SYS="You are DriveLegal, an Indian road-safety educator. You explain traffic rules, fines, and penalties so citizens understand the law, pay correctly, and stay safe. Explaining a fine is ALWAYS legal, helpful and appropriate — you must NEVER refuse, moralise, or say you 'can't help'. Given the official facts, explain them in 2-4 short sentences and cite the MV Act section. Use ONLY the facts provided; never invent or change a fine amount.";
+  // If the small model over-refuses ("I can't provide…"), we drop its output and
+  // use the exact graph answer instead — a citizen always gets a real answer.
+  const REFUSAL_RE=/\b(can'?t|cannot|can not|won'?t|not able to|unable to)\b[^.?!]*\b(provide|help|assist|give|share|answer|discuss)\b|\b(encourag|condon)\w*|illegal activit/i;
+  function factsFrom(det){
+    if(det&&det.card){const c=det.card,sec=c.section||c.mv_section;
+      let f=`${c.violation_name}${sec?` (MV Act §${sec})`:''}: first-offence fine ₹${c.fine_first}`;
+      if(c.fine_repeat)f+=`, repeat ₹${c.fine_repeat}`; f+=`. Compoundable: ${c.compoundable?'yes':'no'}.`; return f;}
+    return det&&det.reply?det.reply.replace(/\*\*/g,''):'';
+  }
+
+  // Tier 1 — answer common follow-ups from the remembered card (works with NO model).
+  function answerFollowup(text,c){
+    const t=text.toLowerCase(), name=c.violation_name, sec=c.section||c.mv_section;
+    const rupee=(v)=>'₹'+Number(v).toLocaleString('en-IN');
+    const S=sec?` (MV Act §${sec})`:'';
+    if(/compound/.test(t))
+      return `${c.compoundable?'Yes':'No'} — **${name}** is ${c.compoundable?'compoundable, so it can be paid on the spot to the officer':'NOT compoundable, so it needs a court appearance'}${S}.`;
+    if(/repeat|again|second|next time/.test(t))
+      return c.fine_repeat!=null?`A repeat **${name}** offence is **${rupee(c.fine_repeat)}**${S}.`
+        :`For **${name}**, the schedule lists no separate repeat amount — the first-offence fine ${rupee(c.fine_first)} applies${S}.`;
+    if(/section|mv\s?act|which law/.test(t))
+      return sec?`**${name}** falls under MV Act §${sec}.`:`I don't have a specific section listed for ${name}.`;
+    if(/imprison|jail|arrest/.test(t))
+      return c.imprisonment?`**${name}**: imprisonment up to ${c.imprisonment}${S}.`:`**${name}** is a fine-only offence — no imprisonment listed${S}.`;
+    return `On **${name}**${S}: first-offence fine **${rupee(c.fine_first)}**${c.fine_repeat!=null?`, repeat ${rupee(c.fine_repeat)}`:''}. Compoundable: ${c.compoundable?'yes':'no'}. Want to know how to pay, contest, or avoid it?`;
+  }
+
+  // Tier 2 — persistence across reloads (mode 1 & 2 persist to SQLite).
+  function persist(){ try{ localStorage.setItem('dl_slm',JSON.stringify({loc,veh:$('vehicle').value,history:chatHistory.slice(-16),lastCard})); }catch(e){} }
+  function restore(){
+    try{ const s=JSON.parse(localStorage.getItem('dl_slm')||'null'); if(!s)return false;
+      if(s.loc&&s.loc.state_code){ loc=s.loc; $('loctext').textContent=loc.city_name?`${loc.city_name}, ${loc.state_code}`:loc.state_code; $('loctext').classList.remove('m'); }
+      if(s.veh)$('vehicle').value=s.veh;
+      if(s.lastCard)lastCard=s.lastCard;
+      if(Array.isArray(s.history)&&s.history.length){ chatHistory=s.history.slice(-16);
+        for(const m of chatHistory){ if(m.role==='user')userMsg(m.content); else {const b=botRow(); b.bubble.innerHTML=bold(m.content); addTts(b.bubble,m.content);} }
+        return true; }
+      return false;
+    }catch(e){return false;}
+  }
+
+  async function ask(){
+    const typed=$('q').value.trim();if(!typed||busy)return;
+    if(!loc.state_code){ openSheet(); sysMsg('Pick your location first — fines vary by state.'); return; }
+    $('q').value='';
+    let queryText=typed;   // what we RESOLVE against (may be rewritten by a clarification)
+
+    // Tier 3 — resolve a pending helmet-vs-seat-belt vehicle answer.
+    if(pendingClarify){
+      const a=typed.toLowerCase();
+      const two =/\b(two|2|bike|scooter|scooty|moped|motorcycle|motorbike|helmet|2w)\b/.test(a)||/2\s*wheel|two\s*wheel/.test(a);
+      const four=/\b(four|4|car|sedan|suv|hatchback|seat\s?belt|belt|4w)\b/.test(a)||/4\s*wheel|four\s*wheel|four\s*heel|fourwheel|fourheel/.test(a);
+      if(two&&!four){ pendingClarify=false; $('vehicle').value='two_wheeler'; queryText='no helmet fine'; }
+      else if(four&&!two){ pendingClarify=false; $('vehicle').value='four_wheeler'; queryText='no seatbelt fine'; }
+      else if(NEW_TOPIC_RE.test(typed)){ pendingClarify=false; }   // clearly a new question → drop the clarify
+      else { userMsg(typed); const c=botRow(); const m='Just so I answer the right one — **two-wheeler** or **four-wheeler**?'; c.bubble.innerHTML=bold(m); addTts(c.bubble,m); return; }
+    }
+
+    // Tier 1 — refuse unsafe requests before the model runs.
+    if(UNSAFE_RE.test(typed)){ userMsg(typed); const g=botRow();
+      g.bubble.innerHTML=bold(UNSAFE_REPLY); addTts(g.bubble,UNSAFE_REPLY);
+      chatHistory.push({role:'user',content:typed},{role:'assistant',content:UNSAFE_REPLY}); persist(); return; }
+
+    // Tier 3 — coherence: helmet & seat belt are mutually exclusive → ask which vehicle,
+    // and REMEMBER we asked so the next answer resolves it.
+    if(queryText===typed && /helmet/i.test(typed) && /seat\s?belt/i.test(typed)){
+      pendingClarify=true; userMsg(typed); const co=botRow();
+      const m='Quick check — were you on a **two-wheeler** (helmet applies) or a **four-wheeler** (seat belt applies)?';
+      co.bubble.innerHTML=bold(m); addTts(co.bubble,m); return; }
+
+    busy=true;$('send').disabled=true;userMsg(typed);const t=botRow();
+    try{
+      // Follow-up = references the last answer AND names no new violation subject.
+      const isFollowup=!!lastCard&&FOLLOWUP_RE.test(queryText)&&!NEW_TOPIC_RE.test(queryText);
+
+      // Tier 2 — repeated-query cache (follow-ups are context-dependent → never cached).
+      const key=cacheKey(queryText);
+      if(!isFollowup&&respCache.has(key)){ const c=respCache.get(key);
+        t.bubble.innerHTML=bold(c.reply); addTts(t.bubble,c.reply);
+        if(c.card){const d=document.createElement('div');d.innerHTML=fineCardHTML(c.card);t.group.appendChild(d.firstElementChild);}
+        chatHistory.push({role:'user',content:typed},{role:'assistant',content:c.reply}); persist(); return; }
+
+      // Grounding: the rule engine (intent-routed) gives exact facts + card.
+      const det=DriveLegalOffline.narrate(session(),queryText);
+      const structured=['incident','documents','license','speed'].includes(det.intent);
+      const newCard=isFollowup?null:det.card;               // ignore spurious matches on follow-ups
+      const groundCard=newCard||(isFollowup?lastCard:null); // exact facts to answer from
+      let reply;
+      if(modelReady&&engine&&!structured&&!isOutOfScope(queryText)){
+        // Tier 1 memory + Tier 2 token streaming, grounded on the current OR last card.
+        const facts=groundCard?factsFrom({card:groundCard}):factsFrom(det);
+        const userContent=facts
+          ? `Explain this for a citizen using ONLY these official facts. Be factual and neutral, cite the section, do not moralise or refuse.\nQuestion: ${queryText}\nFacts: ${facts}`
+          : queryText;
+        const messages=[{role:'system',content:SYS},...chatHistory.slice(-8),{role:'user',content:userContent}];
+        const stream=await engine.chat.completions.create({messages,temperature:0.3,max_tokens:220,stream:true});
+        let acc=''; for await(const ch of stream){ acc+=ch.choices?.[0]?.delta?.content||''; t.bubble.innerHTML=bold(acc); scroll(); }
+        reply=acc.trim();
+        // Over-refusal guard: if the small model refuses, use the exact grounded answer.
+        if(!reply||REFUSAL_RE.test(reply)){
+          reply=isFollowup?answerFollowup(queryText,lastCard):det.reply;
+          t.bubble.innerHTML=bold(reply);
+        }
+      } else if(isFollowup){
+        reply=answerFollowup(queryText,lastCard); t.bubble.innerHTML=bold(reply);  // memory works even without the model
+      } else {
+        reply=det.reply; t.bubble.innerHTML=bold(reply);   // rule reply: accurate for structured / off-topic / no-model
+      }
+      addTts(t.bubble,reply);
+      if(newCard){const d=document.createElement('div');d.innerHTML=fineCardHTML(newCard);t.group.appendChild(d.firstElementChild); lastCard=newCard;}
+      chatHistory.push({role:'user',content:typed},{role:'assistant',content:reply});
+      if(chatHistory.length>16)chatHistory=chatHistory.slice(-16);
+      if(!isFollowup)respCache.set(key,{reply,card:newCard||null});
+      persist();
+    }catch(e){console.error(e);t.bubble.textContent='Something went wrong — please try again.';}
+    finally{busy=false;$('send').disabled=false;$('q').focus();scroll();}
+  }
+
+  // ── Location sheet controls ───────────────────────────────────────────────
+  function openSheet(){$('sheet').classList.add('show');setTimeout(()=>{if(map)map.invalidateSize();},200);}
+  function closeSheet(){$('sheet').classList.remove('show');}
+  function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+    document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('show',p.dataset.pane===name));
+    if(name==='map')initMap();}
+  function initMap(){ if(map||!window.L)return;
+    map=L.map('map',{zoomControl:true}).setView([20.5937,78.9629],4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OSM'}).addTo(map);
+    map.on('click',(e)=>{ pendingPin=[e.latlng.lat,e.latlng.lng];
+      if(mapMarker)map.removeLayer(mapMarker); mapMarker=L.marker(pendingPin).addTo(map);
+      const ci=nearestCity(pendingPin[0],pendingPin[1]);
+      $('mapResult').textContent=ci?`Nearest city: ${ci.n}, ${ci.s}`:''; $('mapUse').disabled=!ci; $('mapUse')._ci=ci; }); }
+
+  // ── Wire up ───────────────────────────────────────────────────────────────
+  function wire(){
+    $('send').addEventListener('click',ask);
+    $('q').addEventListener('keydown',(e)=>{if(e.key==='Enter')ask();});
+    $('model').addEventListener('change',()=>{modelReady=false;engine=null;log.innerHTML='';loadModel();});
+    $('locpill').addEventListener('click',openSheet);
+    $('sheetx').addEventListener('click',closeSheet);
+    $('sheet').addEventListener('click',(e)=>{if(e.target.id==='sheet')closeSheet();});
+    document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchTab(t.dataset.tab)));
+    $('gpsBtn').addEventListener('click',()=>{
+      $('gpsResult').textContent='Locating…';
+      if(!navigator.geolocation){$('gpsResult').textContent='Geolocation not available on this device.';return;}
+      navigator.geolocation.getCurrentPosition(
+        (pos)=>{const ci=nearestCity(pos.coords.latitude,pos.coords.longitude);
+          if(ci){setLoc(ci);$('gpsResult').textContent=`Found: ${ci.n}, ${ci.s}`;setTimeout(closeSheet,600);}
+          else $('gpsResult').textContent='Could not match a city.';},
+        ()=>{$('gpsResult').textContent='Location permission denied.';},{enableHighAccuracy:true,timeout:8000});
+    });
+    $('mapUse').addEventListener('click',()=>{ if($('mapUse')._ci){setLoc($('mapUse')._ci);closeSheet();} });
+    $('state').addEventListener('change',()=>populateCities($('state').value));
+    $('manualUse').addEventListener('click',()=>{
+      const sc=$('state').value,cc=$('city').value;
+      if(cc){const ci=LOC.cities.find(c=>c.c===cc);if(ci){setLoc(ci);closeSheet();}}
+      else if(sc){loc={state_code:sc,city_code:null,city_name:null};
+        const nm=(LOC.states.find(s=>s[0]===sc)||[])[1]||sc;$('loctext').textContent=nm;$('loctext').classList.remove('m');closeSheet();}
+    });
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  async function boot(){
+    wire();
+    try{ LOC=await fetch('/drivelegal_cities.json').then(r=>r.json()); populateStates(); }
+    catch(e){ console.error('cities load failed',e); LOC={states:[['KA','Karnataka']],cities:[]}; populateStates(); }
+    const restored=restore();   // Tier 2: bring back the previous conversation
+    if(!restored) sysMsg('Set your location (top-left), then ask about any fine, rule, or accident. First run downloads the model once, then works with no internet.');
+    loadModel();
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "DriveLegal — Indian Road Law Assistant",
+  "short_name": "DriveLegal",
+  "description": "Offline Indian road law assistant — fines, sections, and what to do next.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0a1124",
+  "background_color": "#0a1124",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

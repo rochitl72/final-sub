@@ -1,0 +1,2817 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DriveLegal — Indian Road Law Assistant</title>
+<meta name="theme-color" content="#050d1f">
+<meta name="description" content="Offline Indian road law assistant — fines, sections, and what to do next.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/logo.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+:root {
+  /* Surface levels — each lighter + more opaque */
+  --s0: #050d1f;
+  --s1: rgba(10,18,40,0.95);
+  --s2: rgba(17,27,58,0.90);
+  --s3: rgba(24,38,80,0.85);
+
+  /* Borders */
+  --border:        1px solid rgba(255,255,255,0.06);
+  --border-accent: 1px solid rgba(59,130,246,0.30);
+  --border-subtle: 1px solid rgba(255,255,255,0.12);
+
+  /* Accent */
+  --accent:       #3b82f6;
+  --accent-bright:#60a5fa;
+  --accent-dim:   rgba(59,130,246,0.15);
+
+  /* Text */
+  --t1: #f1f5f9;
+  --t2: #94a3b8;
+  --t3: #475569;
+
+  /* Semantic */
+  --danger:  #ef4444;
+  --warn:    #f59e0b;
+  --success: #22c55e;
+
+  /* Shadows */
+  --shadow:      0 24px 60px -28px rgba(0,0,0,0.7);
+  --shadow-soft: 0 6px 20px -10px rgba(0,0,0,0.55);
+  --shadow-card: 0 24px 50px -22px rgba(0,0,0,0.65);
+
+  /* Glass */
+  --blur: blur(20px) saturate(180%);
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+
+[data-theme="light"] {
+  --s0: #f8fafc;
+  --s1: rgba(255,255,255,0.97);
+  --s2: rgba(241,245,249,0.95);
+  --s3: rgba(226,232,240,0.92);
+
+  --border:        1px solid rgba(15,23,42,0.07);
+  --border-accent: 1px solid rgba(37,99,235,0.25);
+  --border-subtle: 1px solid rgba(15,23,42,0.12);
+
+  --accent:       #2563eb;
+  --accent-bright:#3b82f6;
+  --accent-dim:   rgba(37,99,235,0.10);
+
+  --t1: #0f172a;
+  --t2: #475569;
+  --t3: #94a3b8;
+
+  --danger:  #dc2626;
+  --warn:    #d97706;
+  --success: #16a34a;
+
+  --shadow:      0 18px 40px -20px rgba(20,40,90,0.18);
+  --shadow-soft: 0 6px 16px -8px rgba(20,40,90,0.12);
+  --shadow-card: 0 22px 44px -22px rgba(20,40,90,0.22);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--t1);
+  background-color: var(--s0);
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.25) 0%, transparent 65%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+[data-theme="light"] body,
+[data-theme="light"] html {
+  background-color: var(--s0);
+  background-image:
+    linear-gradient(rgba(15,23,42,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,0.03) 1px, transparent 1px),
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59,130,246,0.12) 0%, transparent 65%);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+}
+
+button, input, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Focus rings — AA contrast */
+:where(button,a,input,[role="button"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Tabular nums for amounts */
+.fine-amount, .fine-row, .diff-line, .chat-item .meta, #health-badge, .badge, .geo-row {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Animations (reduced-motion guard) ───────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes rowFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30%           { transform: translateY(-4px); }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to   { background-position:  200% 0; }
+  }
+  @keyframes pulseDot {
+    0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+    50%     { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+  }
+  @keyframes sheetUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: none;             opacity: 1; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes sendBurst {
+    0%   { opacity: 0.6; transform: scale(1); }
+    100% { opacity: 0;   transform: scale(2.2); }
+  }
+}
+
+/* ── Button system ───────────────────────────────────────────────────────── */
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 0 0 0 rgba(59,130,246,0);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn-primary { transition: all 200ms cubic-bezier(0.4,0,0.2,1); }
+  .btn-primary:hover {
+    box-shadow: 0 0 20px 2px rgba(59,130,246,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active { transform: scale(0.97); }
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--t2);
+  border: var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn-ghost { transition: all 180ms cubic-bezier(0.4,0,0.2,1); }
+  .btn-ghost:hover {
+    background: var(--s2);
+    border-color: rgba(255,255,255,0.15);
+  }
+}
+
+.btn-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: var(--border);
+  color: var(--t2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn-icon { transition: all 180ms cubic-bezier(0.4,0,0.2,1); }
+  .btn-icon:hover { background: var(--s2); border-color: rgba(255,255,255,0.15); color: var(--t1); }
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* ── Chip system ─────────────────────────────────────────────────────────── */
+.chip {
+  background: var(--s2);
+  border: var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--t2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  user-select: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chip { transition: all 180ms cubic-bezier(0.4,0,0.2,1); }
+  .chip:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+  }
+}
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
+#app {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "sidebar header"
+    "sidebar main";
+  height: 100vh;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+#sidebar {
+  grid-area: sidebar;
+  background: var(--s1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-right: var(--border);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+  z-index: 20;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 10px;
+  background: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(59,130,246,0.12) 0%, transparent 70%);
+}
+/* Logo wrapper with DL monogram fallback */
+.logo-wrap {
+  position: relative;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.logo-wrap img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 8px;
+}
+.logo-wrap::after {
+  content: "DL";
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  border-radius: 8px;
+}
+.logo-wrap.img-error::after { display: flex; }
+.logo-wrap.img-error img { display: none; }
+
+.sidebar-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 15px;
+  color: var(--t1);
+}
+.sidebar-tag {
+  font-size: 10px;
+  color: var(--t3);
+  margin-top: 1px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sidebar-actions {
+  padding: 6px 12px 8px;
+}
+.new-chat-btn {
+  width: 100%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.new-chat-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.3), transparent 60%);
+  opacity: 0;
+  z-index: -1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .new-chat-btn::after { transition: opacity 0.35s ease; }
+  .new-chat-btn:active::after { opacity: 1; transition: none; }
+}
+
+.sidebar-search-wrap { padding: 4px 12px 10px; }
+.sidebar-search {
+  width: 100%;
+  background: var(--s2);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--t1);
+  outline: none;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-search { transition: border-color 200ms, box-shadow 200ms; }
+}
+.sidebar-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+.sidebar-search::placeholder { color: var(--t3); }
+
+.chats-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chats-list::-webkit-scrollbar { width: 4px; }
+.chats-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+.chats-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--t3);
+  padding: 8px 12px 4px;
+}
+
+.chat-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+/* Left-border accent strip — slides in on hover via scaleY */
+.chat-item::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+  transform: scaleY(0);
+  transform-origin: top center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chat-item { transition: background 150ms, border-color 150ms; }
+  .chat-item::before { transition: transform 180ms cubic-bezier(0.4,0,0.2,1); }
+}
+.chat-item:hover { background: var(--s2); }
+.chat-item:hover::before { transform: scaleY(1); }
+.chat-item.active {
+  background: var(--accent-dim);
+  border-color: rgba(59,130,246,0.2);
+}
+.chat-item.active::before { transform: scaleY(1); }
+.chat-item .title {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 6px;
+  color: var(--t1);
+}
+.chat-item .meta {
+  grid-column: 1 / 2;
+  font-size: 11px;
+  color: var(--t3);
+  padding-left: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+}
+.mode-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--s3);
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  border: var(--border);
+}
+.mode-badge.dynamic {
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+  border-color: rgba(59,130,246,0.2);
+}
+.chat-item .menu {
+  background: none;
+  border: none;
+  padding: 3px 6px;
+  border-radius: 6px;
+  color: var(--t3);
+  cursor: pointer;
+  opacity: 0.45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chat-item .menu { transition: opacity 150ms, background 150ms, color 150ms; }
+}
+.chat-item:hover .menu,
+.chat-item .menu:focus-visible { opacity: 1; }
+.chat-item .menu:hover { background: rgba(239,68,68,0.12); color: var(--danger); }
+
+.sidebar-empty {
+  text-align: center;
+  font-size: 12px;
+  color: var(--t3);
+  padding: 20px 12px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+#header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 20px;
+  background: var(--s1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 15;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand .logo-wrap { width: 36px; height: 36px; border-radius: 10px; }
+.brand-text .name {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-size: 16px;
+  line-height: 1.1;
+  color: var(--t1);
+}
+.brand-text .tagline {
+  font-size: 10px;
+  color: var(--t3);
+  margin-top: 1px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sidebar-toggle {
+  display: none;
+  background: var(--s2);
+  border: var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--t2);
+  cursor: pointer;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Segmented control */
+.seg {
+  position: relative;
+  display: inline-flex;
+  background: var(--s2);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 0;
+}
+.seg-thumb {
+  position: absolute;
+  top: 3px; bottom: 3px;
+  left: 3px; width: 0;
+  background: var(--s3);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .seg-thumb { transition: left 220ms cubic-bezier(0.4,0,0.2,1), width 220ms cubic-bezier(0.4,0,0.2,1); }
+}
+.seg-btn {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .seg-btn { transition: color 220ms; }
+}
+.seg-btn.active { color: var(--t1); }
+.seg-btn:not(.active):hover { color: var(--t2); }
+
+/* Icon buttons (header controls) */
+.icon-btn {
+  background: var(--s2);
+  border: var(--border);
+  border-radius: 50%;
+  width: 34px; height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t2);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .icon-btn { transition: all 180ms cubic-bezier(0.4,0,0.2,1); }
+  .icon-btn:hover {
+    color: var(--t1);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 0 12px rgba(59,130,246,0.15);
+  }
+}
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* Theme toggle cross-fade */
+.theme-toggle-icons {
+  position: relative;
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.theme-toggle-icons svg {
+  position: absolute; top: 0; left: 0;
+  width: 18px; height: 18px;
+  opacity: 0;
+  transform: rotate(-60deg) scale(0.7);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .theme-toggle-icons svg { transition: opacity 200ms ease, transform 200ms cubic-bezier(0.4,0,0.2,1); }
+}
+[data-theme="dark"]  .theme-toggle-icons .icon-moon { opacity: 1; transform: rotate(0deg) scale(1); }
+[data-theme="light"] .theme-toggle-icons .icon-sun  { opacity: 1; transform: rotate(0deg) scale(1); }
+
+/* Health / status badge */
+#health-badge {
+  font-size: 11px; padding: 5px 11px; border-radius: 999px;
+  background: var(--s2); border: var(--border);
+  color: var(--t2);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 500; white-space: nowrap;
+}
+#health-badge.ready { color: var(--success); border-color: rgba(34,197,94,0.3); }
+#health-badge.error { color: var(--danger);  border-color: rgba(239,68,68,0.3); }
+
+/* Status dot pulse */
+#health-badge .status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--t3);
+}
+#health-badge.ready .status-dot {
+  background: var(--success);
+}
+@media (prefers-reduced-motion: no-preference) {
+  #health-badge.ready .status-dot { animation: pulseDot 2s infinite; }
+}
+
+#reset-btn {
+  background: var(--s2);
+  border: var(--border);
+  border-radius: 8px;
+  color: var(--t2);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #reset-btn { transition: all 180ms; }
+}
+#reset-btn:hover { color: var(--danger); border-color: rgba(239,68,68,0.35); }
+
+/* Offline status strip */
+#status-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 20px;
+  font-size: 11px;
+  color: var(--t3);
+  background: var(--s1);
+  border-bottom: var(--border);
+  letter-spacing: 0.01em;
+}
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--t3);
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dot { transition: background 300ms, box-shadow 300ms; }
+}
+#status-strip.warm .dot {
+  background: var(--success);
+  box-shadow: 0 0 0 0 rgba(34,197,94,0.4);
+}
+@media (prefers-reduced-motion: no-preference) {
+  #status-strip.warm .dot { animation: pulseDot 2s infinite; }
+}
+
+/* ── Main ────────────────────────────────────────────────────────────────── */
+#main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Map panel ───────────────────────────────────────────────────────────── */
+#map-panel {
+  position: relative;
+  flex: 0 0 44%;
+  display: flex;
+  flex-direction: column;
+  border-bottom: var(--border);
+}
+@media (prefers-reduced-motion: no-preference) {
+  #map-panel { transition: flex-basis 350ms cubic-bezier(0.2,0.8,0.2,1); }
+}
+#map-panel::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 36px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--s1));
+  opacity: 0.6;
+  z-index: 1001;
+}
+#map-panel.collapsed { flex: 0 0 56px; }
+#map-panel.collapsed #map { opacity: 0.4; pointer-events: none; }
+#map-panel.collapsed #pin-hint, #map-panel.collapsed #geo-overlay { display: none !important; }
+
+#map-toolbar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 1002;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 10px 16px;
+  background: var(--s1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: var(--border);
+}
+.toolbar-label {
+  font-size: 12px; color: var(--t2);
+  display: flex; align-items: center; gap: 8px;
+}
+.toolbar-label strong { color: var(--t1); font-weight: 600; }
+
+.switch { position: relative; display: inline-block; width: 38px; height: 20px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background-color: var(--s3); border: var(--border); border-radius: 20px;
+}
+.slider::before {
+  position: absolute; content: "";
+  height: 14px; width: 14px;
+  left: 2px; top: 2px;
+  background-color: var(--t3); border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .slider, .slider::before { transition: background-color 200ms, border-color 200ms, transform 200ms cubic-bezier(0.4,0,0.2,1); }
+}
+.switch input:checked + .slider {
+  background-color: var(--accent-dim);
+  border-color: var(--accent);
+}
+.switch input:checked + .slider::before {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+#map-wrap {
+  flex: 1; position: relative; min-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 50px 12px 12px;
+  background: var(--s2);
+  border: var(--border);
+}
+#map { width: 100%; height: 100%; }
+
+#pin-hint {
+  position: absolute; bottom: 22px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--s1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: var(--border); border-radius: 999px;
+  padding: 6px 16px; font-size: 12px; color: var(--t2);
+  pointer-events: none; z-index: 999; white-space: nowrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #pin-hint { transition: opacity 300ms ease; }
+}
+#pin-hint.hidden { opacity: 0; }
+
+#geo-overlay {
+  position: absolute; top: 62px; left: 18px; z-index: 1000;
+  background: var(--s1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: var(--border); border-radius: var(--radius-sm);
+  padding: 10px 14px; min-width: 200px; max-width: 260px; display: none;
+  box-shadow: var(--shadow-soft);
+}
+#geo-overlay.show { display: block; }
+.geo-row {
+  font-size: 12px; color: var(--t2); margin-bottom: 3px;
+  display: flex; align-items: center; gap: 7px;
+}
+.geo-row svg { flex-shrink: 0; }
+.geo-val { color: var(--t1); font-weight: 600; }
+
+/* Leaflet pin */
+.leaflet-div-icon { background: transparent; border: none; }
+.pin-icon {
+  width: 30px; height: 40px;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5));
+}
+
+/* ── Chat panel ──────────────────────────────────────────────────────────── */
+#chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+#ctx-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 20px;
+  background: var(--s1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom: var(--border);
+  flex-shrink: 0; min-height: 40px;
+}
+.ctx-chip {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  background: var(--accent-dim); color: var(--accent-bright);
+  border: var(--border-accent);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  user-select: none; font-weight: 600;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ctx-chip { transition: all 180ms cubic-bezier(0.4,0,0.2,1); }
+  .ctx-chip:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.25); }
+}
+.ctx-chip.empty {
+  color: var(--t3); background: transparent;
+  border: 1px dashed rgba(255,255,255,0.1); font-weight: 400;
+}
+.ctx-chip.road  { color: var(--success);  background: rgba(34,197,94,0.10);  border-color: rgba(34,197,94,0.25); }
+.ctx-chip.veh   { color: var(--warn);     background: rgba(245,158,11,0.10); border-color: rgba(245,158,11,0.25); }
+.ctx-chip.viol  { color: var(--danger);   background: rgba(239,68,68,0.10);  border-color: rgba(239,68,68,0.25); }
+.ctx-chip svg   { width: 11px; height: 11px; opacity: 0.75; }
+
+#progress {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 20px;
+  background: var(--s1);
+  border-bottom: var(--border);
+  flex-shrink: 0;
+  font-size: 11px; color: var(--t3);
+  overflow-x: auto; white-space: nowrap;
+}
+.prog-step { display: inline-flex; align-items: center; gap: 5px; }
+.prog-step .mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--s3); border: var(--border);
+  font-size: 8px; color: var(--t3); font-weight: 700;
+}
+.prog-step.done .mark {
+  background: var(--accent);
+  border-color: transparent; color: #fff;
+}
+.prog-step.done { color: var(--t2); }
+.prog-step.active { color: var(--accent-bright); }
+.prog-step.active .mark { border-color: var(--accent); color: var(--accent-bright); }
+.prog-sep { color: rgba(255,255,255,0.1); }
+
+/* ── Messages ────────────────────────────────────────────────────────────── */
+#messages {
+  flex: 1; overflow-y: auto;
+  padding: 18px 22px;
+  display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth;
+}
+#messages::-webkit-scrollbar { width: 4px; }
+#messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+.msg { display: flex; flex-direction: column; max-width: 86%; }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.bot  { align-self: flex-start; align-items: flex-start; }
+@media (prefers-reduced-motion: no-preference) {
+  .msg { animation: msgIn 240ms cubic-bezier(0.34,1.2,0.64,1) both; }
+}
+
+.bubble {
+  padding: 11px 15px; border-radius: 18px;
+  line-height: 1.58; font-size: 13.5px;
+  word-break: break-word;
+  box-shadow: var(--shadow-soft);
+  letter-spacing: -0.005em;
+}
+.msg.user .bubble {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff; border-bottom-right-radius: 5px;
+  box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+}
+.msg.bot .bubble {
+  background: var(--s2);
+  border: var(--border);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-bottom-left-radius: 5px;
+}
+
+/* Typing indicator */
+.typing { display: flex; gap: 5px; padding: 5px 2px; }
+.tdot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tdot { animation: typingBounce 900ms infinite ease-in-out; }
+  .tdot:nth-child(2) { animation-delay: 160ms; }
+  .tdot:nth-child(3) { animation-delay: 320ms; }
+}
+
+/* Chip row under bubble */
+.quick-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.qr-btn {
+  padding: 5px 14px; border-radius: 20px;
+  font-size: 12px; cursor: pointer; font-weight: 500;
+  color: var(--accent-bright);
+  background: var(--s2);
+  border: var(--border-accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .qr-btn { transition: all 180ms cubic-bezier(0.4,0,0.2,1); }
+  .qr-btn:hover {
+    background: var(--accent-dim);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+  }
+}
+.qr-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Detail table ────────────────────────────────────────────────────────── */
+.detail-table {
+  background: var(--s2);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: 10px;
+  font-size: 12px;
+  width: 100%;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  gap: 12px;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+@media (prefers-reduced-motion: no-preference) {
+  .detail-row {
+    animation: rowFadeIn 280ms cubic-bezier(0.22,1,0.36,1) both;
+    animation-delay: calc(var(--i,0) * 40ms);
+  }
+}
+.detail-label {
+  color: var(--t3);
+  min-width: 110px;
+  flex-shrink: 0;
+}
+.detail-value {
+  color: var(--t1);
+  text-align: right;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* ── Explain panel (why this fine?) ─────────────────────────────────────── */
+.explain-panel {
+  margin-top: 8px;
+  font-size: 12px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.02);
+  overflow: hidden;
+}
+.explain-panel summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  color: var(--t2);
+  font-weight: 500;
+  list-style: none;
+  user-select: none;
+}
+.explain-panel summary::-webkit-details-marker { display: none; }
+.explain-panel summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.explain-panel[open] summary::before { transform: rotate(90deg); }
+.explain-body {
+  padding: 0 12px 10px;
+  color: var(--t2);
+  line-height: 1.45;
+}
+.explain-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+.explain-meta {
+  font-size: 11px;
+  color: var(--t3);
+  margin-top: 6px;
+}
+
+/* ── Fine card ───────────────────────────────────────────────────────────── */
+.fine-card {
+  background: var(--s2);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px; margin-top: 10px; width: 100%;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fine-card { animation: cardIn 300ms cubic-bezier(0.22,1,0.36,1) both; }
+}
+
+.fine-card .updated-pill {
+  position: absolute; top: -12px; right: 14px;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+  padding: 4px 12px; border-radius: 999px;
+  color: #fff; text-transform: uppercase;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: var(--border);
+  box-shadow: 0 4px 14px rgba(37,99,235,0.4);
+  overflow: hidden;
+}
+.fine-card .updated-pill::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    transparent 25%, rgba(255,255,255,0.1) 50%, transparent 75%);
+  background-size: 200% 100%;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fine-card .updated-pill::before { animation: shimmer 2.4s linear infinite; }
+}
+.fine-card .updated-pill button {
+  position: relative; z-index: 1;
+  background: rgba(255,255,255,0.18);
+  border: none; color: #fff;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; cursor: pointer;
+  text-transform: none; letter-spacing: 0;
+}
+.fine-card .updated-pill button:hover { background: rgba(255,255,255,0.30); }
+
+/* Amount with gradient text */
+.fine-amount {
+  font-size: 30px; font-weight: 700;
+  display: flex; align-items: baseline; gap: 10px;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--accent-bright), #93c5fd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.fine-amount .fine-label {
+  font-size: 11px; font-weight: 600;
+  color: var(--t3); text-transform: uppercase; letter-spacing: 0.10em;
+  background: none;
+  -webkit-text-fill-color: var(--t3);
+}
+
+.fine-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.badge {
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.01em;
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid transparent;
+}
+/* Colored dot inside badge instead of emoji */
+.badge::before {
+  content: "";
+  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+}
+.badge.green  { background: rgba(34,197,94,0.12);  color: var(--success); border-color: rgba(34,197,94,0.25); }
+.badge.green::before  { background: var(--success); }
+.badge.orange { background: rgba(245,158,11,0.12); color: var(--warn);    border-color: rgba(245,158,11,0.25); }
+.badge.orange::before { background: var(--warn); }
+.badge.red    { background: rgba(239,68,68,0.12);  color: var(--danger);  border-color: rgba(239,68,68,0.25); }
+.badge.red::before    { background: var(--danger); }
+.badge.blue   { background: var(--accent-dim);     color: var(--accent-bright); border-color: rgba(59,130,246,0.25); }
+.badge.blue::before   { background: var(--accent); }
+
+.fine-divider { border: none; border-top: var(--border); margin: 9px 0; }
+.fine-row { font-size: 12.5px; color: var(--t2); margin-bottom: 5px; line-height: 1.55; }
+.fine-row strong { color: var(--t1); font-weight: 600; }
+.diff-line {
+  font-size: 11.5px; color: var(--t2);
+  margin-top: 5px; padding-top: 5px; border-top: 1px dashed rgba(255,255,255,0.08);
+}
+.diff-line .old { text-decoration: line-through; color: var(--t3); }
+.diff-line .new { color: var(--success); font-weight: 600; }
+
+/* ── Input row ───────────────────────────────────────────────────────────── */
+#input-row {
+  display: flex; gap: 10px; padding: 12px 16px;
+  background: var(--s1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-top: var(--border);
+  flex-shrink: 0;
+}
+#msg-input {
+  flex: 1; background: var(--s2); border: var(--border);
+  border-radius: var(--radius-sm); padding: 10px 16px;
+  font-size: 13.5px; outline: none;
+  letter-spacing: -0.005em;
+  color: var(--t1);
+}
+@media (prefers-reduced-motion: no-preference) {
+  #msg-input { transition: border-color 200ms, box-shadow 200ms; }
+}
+#msg-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+#msg-input::placeholder { color: var(--t3); }
+
+#send-btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: none; border-radius: var(--radius-sm);
+  color: #fff; padding: 10px 20px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  box-shadow: 0 0 0 0 rgba(59,130,246,0);
+}
+/* Outward ring burst on click */
+#send-btn::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 20px; height: 20px;
+  margin: -10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #send-btn { transition: all 200ms cubic-bezier(0.4,0,0.2,1); }
+  #send-btn:hover {
+    box-shadow: 0 0 20px 2px rgba(59,130,246,0.4);
+    transform: translateY(-1px);
+  }
+  #send-btn:active { transform: scale(0.97); }
+  #send-btn.burst::after { animation: sendBurst 400ms ease-out forwards; }
+}
+#send-btn:disabled { opacity: 0.4; cursor: default; transform: none; box-shadow: none; }
+
+/* ── Picker / sheet overlay ──────────────────────────────────────────────── */
+#picker-overlay {
+  position: fixed; inset: 0; z-index: 5000;
+  background: rgba(5,13,31,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none; align-items: flex-end; justify-content: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #picker-overlay { animation: fadeIn 180ms ease; }
+}
+#picker-overlay.show { display: flex; }
+
+.picker-modal {
+  width: 100%; max-width: 560px; max-height: 72vh;
+  background: var(--s2);
+  border: var(--border);
+  border-bottom: none;
+  border-top-left-radius: 20px; border-top-right-radius: 20px;
+  display: flex; flex-direction: column;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow);
+  position: relative;
+  padding-top: 14px;
+}
+.picker-modal::before {
+  content: "";
+  position: absolute;
+  top: 8px; left: 50%;
+  transform: translateX(-50%);
+  width: 36px; height: 4px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .picker-modal { animation: sheetUp 320ms cubic-bezier(0.34,1.1,0.64,1); }
+}
+
+.picker-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; border-bottom: var(--border);
+}
+.picker-title { font-weight: 700; font-size: 14px; letter-spacing: -0.015em; color: var(--t1); }
+.picker-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--s3); border: var(--border);
+  color: var(--t2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.picker-close:hover { color: var(--t1); }
+
+.picker-sub { font-size: 12px; color: var(--t2); padding: 10px 20px 0; }
+
+.picker-filter-wrap { padding: 12px 18px 6px; }
+.picker-filter {
+  width: 100%;
+  background: var(--s3); border: var(--border);
+  border-radius: var(--radius-sm); padding: 9px 13px; font-size: 13px;
+  outline: none; color: var(--t1);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .picker-filter { transition: border-color 200ms, box-shadow 200ms; }
+}
+.picker-filter:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+.picker-filter::placeholder { color: var(--t3); }
+
+.picker-chips {
+  padding: 10px 16px 24px; overflow-y: auto;
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+.picker-chip {
+  padding: 8px 15px; border-radius: 20px; font-size: 13px; cursor: pointer;
+  border: var(--border); color: var(--t1);
+  background: var(--s3); font-weight: 500;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .picker-chip { transition: all 150ms cubic-bezier(0.4,0,0.2,1); }
+  .picker-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+  }
+}
+.picker-empty { padding: 20px 14px; color: var(--t3); font-size: 12px; text-align: center; }
+
+.mode-pick-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 14px 20px 24px;
+}
+.mode-pick-card {
+  border: var(--border);
+  background: var(--s3);
+  border-radius: var(--radius);
+  padding: 14px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mode-pick-card { transition: all 150ms cubic-bezier(0.4,0,0.2,1); }
+  .mode-pick-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(59,130,246,0.2);
+  }
+}
+.mode-pick-card .pick-icon { margin-bottom: 10px; color: var(--accent); }
+.mode-pick-card .pick-title { font-weight: 700; font-size: 13.5px; margin-bottom: 4px; color: var(--t1); }
+.mode-pick-card .pick-sub { font-size: 11.5px; color: var(--t2); line-height: 1.5; }
+
+/* Sidebar mobile */
+#sidebar-scrim { display: none; }
+
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 880px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-areas: "header" "main";
+  }
+  #sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 86%; max-width: 300px;
+    transform: translateX(-100%);
+    opacity: 0;
+    z-index: 30;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    #sidebar { transition: transform 280ms cubic-bezier(0.2,0.8,0.2,1), opacity 280ms ease; }
+  }
+  #sidebar.open { transform: translateX(0); opacity: 1; }
+  .sidebar-toggle { display: inline-flex; }
+  #sidebar-scrim {
+    position: fixed; inset: 0; z-index: 25;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    display: none;
+  }
+  #sidebar-scrim.show { display: block; }
+  #map-panel { flex-basis: 38%; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+  <aside id="sidebar" aria-label="Past chats">
+    <div class="sidebar-head">
+      <div class="logo-wrap" id="sb-logo-wrap">
+        <img src="/logo.png" alt="DriveLegal logo" id="sb-logo-img">
+      </div>
+      <div>
+        <div class="sidebar-title">DriveLegal</div>
+        <div class="sidebar-tag">Road law assistant</div>
+      </div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn-primary new-chat-btn" id="new-chat-btn" aria-label="Start a new chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+        New chat
+      </button>
+    </div>
+    <div class="sidebar-search-wrap">
+      <input id="sidebar-search" class="sidebar-search" type="search" placeholder="Search chats" autocomplete="off" aria-label="Search chats">
+    </div>
+    <div id="chats-list" class="chats-list" role="list"></div>
+  </aside>
+  <div id="sidebar-scrim"></div>
+
+  <!-- ── Header ──────────────────────────────────────────────────── -->
+  <header id="header">
+    <div class="brand">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open sidebar" style="border:none;background:var(--s2);border:var(--border);border-radius:8px;padding:7px 9px;color:var(--t2);cursor:pointer;display:inline-flex;align-items:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
+      </button>
+      <div class="logo-wrap" id="hdr-logo-wrap">
+        <img src="/logo.png" alt="DriveLegal logo" id="hdr-logo-img">
+      </div>
+      <div class="brand-text">
+        <div class="name">DriveLegal</div>
+        <div class="tagline">Indian road law assistant</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="seg" role="tablist" aria-label="Conversation mode">
+        <span class="seg-thumb" aria-hidden="true"></span>
+        <button class="seg-btn active" id="mode-static"  role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 12h6M9 15h4" stroke-linecap="round"/></svg>
+          Calculator
+        </button>
+        <button class="seg-btn" id="mode-dynamic" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Chatbot
+        </button>
+      </div>
+      <button class="icon-btn" id="theme-toggle" aria-label="Toggle light or dark theme">
+        <span class="theme-toggle-icons" aria-hidden="true">
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke-linecap="round"/>
+          </svg>
+        </span>
+      </button>
+      <span id="health-badge" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        checking
+      </span>
+      <button id="reset-btn" aria-label="Reset session">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Reset
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Offline status strip ────────────────────────────────────── -->
+  <div id="status-strip" role="status" aria-live="polite">
+    <span class="dot" aria-hidden="true"></span>
+    <span id="status-text">Booting offline shell…</span>
+  </div>
+
+  <!-- ── Main (map + chat) ───────────────────────────────────────── -->
+  <main id="main">
+
+    <!-- Map -->
+    <section id="map-panel" aria-label="Map">
+      <div id="map-toolbar">
+        <label class="toolbar-label">
+          <span class="switch">
+            <input id="geo-toggle" type="checkbox" checked aria-label="Use map location">
+            <span class="slider"></span>
+          </span>
+          <span>Use map location</span>
+        </label>
+        <span class="toolbar-label" id="geo-mode-hint"><strong>Map mode</strong> — tap to drop a pin</span>
+      </div>
+      <div id="map-wrap">
+        <div id="map" role="application" aria-label="Pin map"></div>
+        <div id="geo-overlay" aria-live="polite">
+          <div class="geo-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            <span><span id="geo-city" class="geo-val">—</span></span>
+          </div>
+          <div class="geo-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18" stroke-linecap="round"/></svg>
+            <span>State: <span id="geo-state" class="geo-val">—</span></span>
+          </div>
+        </div>
+        <div id="pin-hint">Tap the map where the incident happened</div>
+      </div>
+    </section>
+
+    <!-- Chat -->
+    <section id="chat-panel" aria-label="Chat">
+      <div id="ctx-bar" aria-label="Editable context"></div>
+      <div id="progress" aria-label="Progress"></div>
+      <div id="messages" role="log" aria-live="polite"></div>
+      <div id="input-row">
+        <input id="msg-input" type="text" placeholder="Type your message or tap a chip…" autocomplete="off" aria-label="Message input"/>
+        <button id="send-btn" aria-label="Send message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Send
+        </button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── Picker overlay (modal sheet) ───────────────────────────── -->
+<div id="picker-overlay" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+  <div class="picker-modal">
+    <div class="picker-header">
+      <span class="picker-title" id="picker-title">Choose</span>
+      <button class="picker-close" id="picker-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="picker-sub" id="picker-sub" hidden></div>
+    <div class="picker-filter-wrap" id="picker-filter-wrap">
+      <input class="picker-filter" id="picker-filter" type="text" placeholder="Search…" autocomplete="off" aria-label="Filter">
+    </div>
+    <div class="picker-chips" id="picker-chips"></div>
+    <div class="mode-pick-row" id="mode-pick-row" hidden></div>
+  </div>
+</div>
+
+<!-- On-device offline engine (resolver + graph + narration). Exposes
+     window.DriveLegalOffline so chat works with zero network. -->
+<script src="/offline.bundle.js"></script>
+<script>
+// =============================================================================
+// DriveLegal v3.3 — premium UI, proactive slots, detail table
+// =============================================================================
+
+// ── SVG icon library (monoline, viewBox 0 0 24 24, stroke-based) ─────────────
+const ICONS = {
+  send:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  reset:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  newChat:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>',
+  moon:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  sun:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke-linecap="round"/></svg>',
+  pin:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+  road:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true"><path d="M3 21L12 3l9 18M7 16h10" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  vehicle:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
+  violation:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  check:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true"><polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chevronRight:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12" aria-hidden="true"><polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  dotsMenu:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>',
+  trash:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><polyline points="3 6 5 6 21 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke-linecap="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  search:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>',
+  chatbot:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  calculator: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>',
+  close:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>',
+  pencil:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="10" height="10" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  bot:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="11" height="11" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M12 11V6M9 6h6M5 11V9a7 7 0 0 1 14 0v2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  calc:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="11" height="11" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/></svg>',
+};
+
+const API            = '';
+let   serverOnline   = true;   // set by checkHealth(); gates on-device fallback
+const LEGACY_KEY     = 'drivelegal_v1';
+const THEME_KEY      = 'drivelegal_theme';
+const ACTIVE_SID_KEY = 'drivelegal_active_session';
+const MAX_MSGS       = 60;
+
+let sessionId        = null;
+let sessionMode      = 'static';
+let geoMode          = 'map';
+let lastSessionState = {};
+let busy             = false;
+let typingEl         = null;
+let pinLat, pinLng;
+let mapMarker        = null;
+let messageLog       = [];
+let pickerCtx        = null;
+let catalogCache     = {};
+let lastAskSlotSig   = null;
+let chatList         = [];
+let chatSearch       = '';
+
+const PREFERS_REDUCED_MOTION = typeof window !== 'undefined'
+  && window.matchMedia
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ── Logo error fallback ───────────────────────────────────────────────────────
+['sb-logo-img','hdr-logo-img'].forEach(id => {
+  const img = document.getElementById(id);
+  if (img) {
+    img.addEventListener('error', () => {
+      const wrap = img.closest('.logo-wrap');
+      if (wrap) wrap.classList.add('img-error');
+    });
+  }
+});
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#050d1f' : '#f8fafc');
+}
+function detectInitialTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'dark' || saved === 'light') return saved;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+    ? 'light' : 'dark';
+}
+applyTheme(detectInitialTheme());
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const cur  = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try { localStorage.setItem(THEME_KEY, next); } catch {}
+});
+
+// ── Leaflet Map ───────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([20.5937, 78.9629], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap',
+  maxZoom: 18,
+}).addTo(map);
+
+// SVG pin icon (no emoji)
+const pinSvg = `<svg class="pin-icon" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12 0C7.58 0 4 3.58 4 8c0 6 8 24 8 24s8-18 8-24c0-4.42-3.58-8-8-8z" fill="#3b82f6"/>
+  <circle cx="12" cy="8" r="3" fill="white"/>
+</svg>`;
+const pinIcon = L.divIcon({
+  className: '',
+  html: pinSvg,
+  iconSize: [24, 32],
+  iconAnchor: [12, 32],
+});
+
+map.on('click', async (e) => {
+  if (geoMode !== 'map' || busy) return;
+  pinLat = e.latlng.lat;
+  pinLng = e.latlng.lng;
+  setPin(pinLat, pinLng);
+  document.getElementById('pin-hint').classList.add('hidden');
+  await sendPin(pinLat, pinLng);
+});
+
+function setPin(lat, lng) {
+  if (mapMarker) map.removeLayer(mapMarker);
+  mapMarker = L.marker([lat, lng], { icon: pinIcon }).addTo(map);
+}
+
+// ── HTTP ──────────────────────────────────────────────────────────────────────
+async function http(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (!r.ok) {
+    const err = new Error(`${r.status} ${r.statusText}`);
+    err.status = r.status;
+    throw err;
+  }
+  if (r.status === 204) return null;
+  const ct = r.headers.get('content-type') || '';
+  return ct.includes('application/json') ? r.json() : r.text();
+}
+
+async function sessionApi(method, path, body) {
+  if (!sessionId) await startSession();
+  try {
+    return await http(method, `/api/session/${sessionId}${path}`, body);
+  } catch (err) {
+    if (err.status === 404) {
+      sessionId = null;
+      messageLog = [];
+      lastSessionState = {};
+      lastAskSlotSig = null;
+      await startSession(sessionMode);
+      return await http(method, `/api/session/${sessionId}${path}`, body);
+    }
+    throw err;
+  }
+}
+
+// ── Session lifecycle ─────────────────────────────────────────────────────────
+async function startSession(mode) {
+  const wantedMode = mode || sessionMode || 'static';
+  const data = await http('POST', '/api/sessions/new', { mode: wantedMode });
+  sessionId   = data.session_id;
+  sessionMode = data.mode || wantedMode;
+  lastSessionState = data.session_state || {};
+  lastAskSlotSig = null;
+  try { localStorage.setItem(ACTIVE_SID_KEY, sessionId); } catch {}
+  try {
+    await http('PUT', `/api/session/${sessionId}/geo_mode`, { mode: geoMode });
+  } catch {}
+  await refreshChatList();
+  applyModeUI();
+  return data;
+}
+
+async function loadSession(sid) {
+  if (busy) return;
+  setBusy(true);
+  try {
+    const data = await http('GET', `/api/sessions/${sid}/history`);
+    sessionId   = data.id;
+    sessionMode = data.mode || 'static';
+    lastSessionState = data.session_state || {};
+    lastAskSlotSig = null;
+    messageLog = [];
+    document.getElementById('messages').innerHTML = '';
+    (data.messages || []).forEach(replayPersistedMessage);
+    applyModeUI();
+    updateCtxBar();
+    updateProgress();
+    syncGeoOverlay();
+    scrollBottom();
+    try { localStorage.setItem(ACTIVE_SID_KEY, sid); } catch {}
+    highlightActiveChat();
+  } catch (err) {
+    showBotBubble('Could not load that chat.');
+    console.error(err);
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ── Catalogs ──────────────────────────────────────────────────────────────────
+async function getCatalog(path) {
+  if (catalogCache[path]) return catalogCache[path];
+  const data = await http('GET', path);
+  catalogCache[path] = data;
+  return data;
+}
+function normCatalog(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items))       return data.items;
+  if (data && Array.isArray(data.states))      return data.states;
+  if (data && Array.isArray(data.cities))      return data.cities;
+  if (data && Array.isArray(data.vehicles))    return data.vehicles;
+  if (data && Array.isArray(data.categories))  return data.categories;
+  return [];
+}
+
+// ── Turn handlers ─────────────────────────────────────────────────────────────
+async function sendTurn(payload) {
+  if (busy) return;
+  setBusy(true);
+  showTyping();
+  try {
+    // On-device path: no network / server down → answer locally (text turns).
+    if (offlineActive() && payload && payload.message) {
+      const data = await offlineTurn(payload.message);
+      removeTyping();
+      handleResponse(data);
+      return;
+    }
+    const data = await sessionApi('POST', '/turn', payload);
+    removeTyping();
+    handleResponse(data);
+  } catch (err) {
+    removeTyping();
+    // Server dropped mid-request → graceful on-device fallback for text turns.
+    if (typeof DriveLegalOffline !== 'undefined' && payload && payload.message) {
+      try {
+        serverOnline = false;
+        handleResponse(await offlineTurn(payload.message));
+        return;
+      } catch (e2) { console.error(e2); }
+    }
+    showBotBubble('Network error. Is the server running?');
+    console.error(err);
+  } finally {
+    setBusy(false);
+    refreshChatList();
+  }
+}
+async function sendPin(lat, lng) {
+  setBusy(true); showTyping();
+  try {
+    const data = await sessionApi('POST', '/geo/pin', { lat, lng });
+    removeTyping(); handleResponse(data);
+  } catch (err) {
+    removeTyping();
+    showBotBubble('Could not resolve that location. Try another spot or switch to chat mode.');
+    console.error(err);
+  } finally { setBusy(false); refreshChatList(); }
+}
+async function sendGeoManual(body) {
+  setBusy(true); showTyping();
+  try {
+    const data = await sessionApi('POST', '/geo/manual', body);
+    removeTyping(); handleResponse(data);
+  } catch (err) {
+    removeTyping();
+    showBotBubble('Could not set that location.');
+    console.error(err);
+  } finally { setBusy(false); refreshChatList(); }
+}
+async function sendSlot(slot, value) {
+  setBusy(true); showTyping();
+  try {
+    const data = await sessionApi('POST', '/slot', { slot, value });
+    removeTyping(); handleResponse(data);
+  } catch (err) {
+    removeTyping();
+    showBotBubble('Could not update that.');
+    console.error(err);
+  } finally { setBusy(false); refreshChatList(); }
+}
+async function sendRevertLocation() {
+  setBusy(true); showTyping();
+  try {
+    const data = await sessionApi('POST', '/revert_location');
+    removeTyping(); handleResponse(data);
+  } catch (err) {
+    removeTyping();
+    showBotBubble('Could not revert location.');
+    console.error(err);
+  } finally { setBusy(false); refreshChatList(); }
+}
+
+// ── Response renderer ─────────────────────────────────────────────────────────
+function askSlotSig(d) {
+  const chips = (d.chips || [])
+    .map(c => (c && (c.id || c.label)) || '')
+    .join('|');
+  return `${d.slot || ''}::${d.question || ''}::${chips}`;
+}
+
+function handleResponse(data) {
+  if (!data) return;
+  if (data.session_state) lastSessionState = data.session_state;
+  syncGeoOverlay();
+
+  switch (data.intent) {
+    case 'ask_slot': {
+      const sig = askSlotSig(data);
+      if (sig !== lastAskSlotSig) {
+        addBotBubble({
+          text:       data.question || 'What next?',
+          chips:      data.chips || [],
+          slot:       data.slot,
+          allow_text: data.allow_text !== false,
+        });
+        lastAskSlotSig = sig;
+      }
+      break;
+    }
+    case 'answer': {
+      addBotBubble({
+        text:         data.reply || '',
+        fine_card:    data.fine_card || null,
+        detail_table: data.detail_table || null,
+        explanation:  data.explanation || null,
+      });
+      lastAskSlotSig = null;
+      break;
+    }
+    case 'answer_updated': {
+      addBotBubble({
+        text:               data.reply || '',
+        fine_card:          data.fine_card || null,
+        detail_table:       data.detail_table || null,
+        previous_fine_card: data.previous_fine_card || null,
+        diff:               data.diff || {},
+        updated:            true,
+        canRevert:          true,
+      });
+      lastAskSlotSig = null;
+      break;
+    }
+    case 'narrate': {
+      if (data.reply || data.fine_card || (data.chips && data.chips.length)) {
+        addBotBubble({
+          text:         data.reply || '',
+          chips:        data.chips || [],
+          fine_card:    data.fine_card || null,
+          detail_table: data.detail_table || null,
+          explanation:  data.explanation || null,
+        });
+      }
+      lastAskSlotSig = null;
+      break;
+    }
+    case 'mode_changed': {
+      sessionMode = data.mode || sessionMode;
+      applyModeUI();
+      if (data.reply) addBotBubble({ text: data.reply });
+      break;
+    }
+    case 'info': {
+      addBotBubble({ text: data.reply || '' });
+      break;
+    }
+    case 'noop': {
+      if (data.reply) addBotBubble({ text: data.reply });
+      break;
+    }
+    default: {
+      if (data.reply || data.fine_card) {
+        addBotBubble({
+          text:         data.reply || '',
+          fine_card:    data.fine_card || null,
+          detail_table: data.detail_table || null,
+        });
+      }
+      lastAskSlotSig = null;
+    }
+  }
+
+  applyModeUI();
+  updateCtxBar();
+  updateProgress();
+}
+
+function syncGeoOverlay() {
+  const s = lastSessionState || {};
+  const cityName  = s.city_name  || s.nearest_city || s.city  || '';
+  const stateCode = s.state_code || s.state || '';
+  if (cityName || stateCode) {
+    document.getElementById('geo-city').textContent  = cityName || '—';
+    document.getElementById('geo-state').textContent = stateCode || '—';
+    if (geoMode === 'map') document.getElementById('geo-overlay').classList.add('show');
+  } else {
+    document.getElementById('geo-overlay').classList.remove('show');
+  }
+}
+
+// ── Bubbles ───────────────────────────────────────────────────────────────────
+function addBotBubble(entry) {
+  const wrapper = renderBotBubble(entry);
+  document.getElementById('messages').appendChild(wrapper);
+  messageLog.push({ type: 'bot', ...entry });
+  if (messageLog.length > MAX_MSGS) messageLog = messageLog.slice(-MAX_MSGS);
+  scrollBottom();
+}
+
+function renderBotBubble(entry) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg bot';
+
+  if (entry.text) {
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = formatText(entry.text);
+    wrapper.appendChild(bubble);
+  }
+
+  // Detail table — rendered BEFORE fine card, after bubble text
+  if (entry.detail_table && entry.detail_table.length) {
+    wrapper.appendChild(buildDetailTable(entry.detail_table));
+  }
+
+  if (entry.explanation) {
+    wrapper.appendChild(buildExplainPanel(entry.explanation));
+  }
+
+  if (entry.chips && entry.chips.length) {
+    const row = document.createElement('div');
+    row.className = 'quick-row';
+    entry.chips.forEach(chip => {
+      const btn = document.createElement('button');
+      btn.className   = 'qr-btn';
+      btn.textContent = chip.label || chip.id;
+      btn.addEventListener('click', () => {
+        if (busy) return;
+        const label = chip.label || chip.id;
+        addUserBubble(label);
+        if (typeof chip.id === 'string' && chip.id.startsWith('free:')) {
+          sendTurn({ message: label });
+        } else {
+          sendTurn({ chip_id: chip.id });
+        }
+      });
+      row.appendChild(btn);
+    });
+    wrapper.appendChild(row);
+  }
+
+  if (entry.fine_card) {
+    wrapper.appendChild(buildFineCard(entry.fine_card, {
+      updated:   !!entry.updated,
+      canRevert: !!entry.canRevert,
+      diff:      entry.diff || null,
+    }));
+  }
+  return wrapper;
+}
+
+function addUserBubble(text) {
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.innerHTML = `<div class="bubble">${esc(text)}</div>`;
+  document.getElementById('messages').appendChild(div);
+  messageLog.push({ type: 'user', text });
+  if (messageLog.length > MAX_MSGS) messageLog = messageLog.slice(-MAX_MSGS);
+  scrollBottom();
+}
+
+function showBotBubble(html) {
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.innerHTML = `<div class="bubble">${html}</div>`;
+  document.getElementById('messages').appendChild(div);
+  scrollBottom();
+}
+
+function showTyping() {
+  typingEl = document.createElement('div');
+  typingEl.className = 'msg bot';
+  typingEl.innerHTML = '<div class="bubble"><div class="typing"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>';
+  document.getElementById('messages').appendChild(typingEl);
+  scrollBottom();
+}
+function removeTyping() { if (typingEl) { typingEl.remove(); typingEl = null; } }
+
+function setBusy(val) {
+  busy = val;
+  document.getElementById('send-btn').disabled = val;
+  document.getElementById('msg-input').disabled = val;
+}
+
+function scrollBottom() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+
+function esc(t) {
+  return String(t)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function formatText(t) {
+  return esc(t)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+    .replace(/\n/g, '<br>');
+}
+
+// Count-up animation (easeOutExpo) for fine amounts
+function animateCountUp(el, from, to, duration) {
+  const target = Number(to) || 0;
+  const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+  if (PREFERS_REDUCED_MOTION || !duration || target === from) {
+    el.textContent = fmt(target);
+    return;
+  }
+  const start = performance.now();
+  const ease  = (t) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t); // easeOutExpo
+  function frame(now) {
+    const t = Math.min(1, (now - start) / duration);
+    el.textContent = fmt(from + (target - from) * ease(t));
+    if (t < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ── Detail table renderer ─────────────────────────────────────────────────────
+function buildDetailTable(rows) {
+  const table = document.createElement('div');
+  table.className = 'detail-table';
+  rows.forEach((row, i) => {
+    const el = document.createElement('div');
+    el.className = 'detail-row';
+    el.style.setProperty('--i', i);
+    const lbl = document.createElement('span');
+    lbl.className = 'detail-label';
+    lbl.textContent = row.label;
+    const val = document.createElement('span');
+    val.className = 'detail-value';
+    val.textContent = row.value;
+    el.appendChild(lbl);
+    el.appendChild(val);
+    table.appendChild(el);
+  });
+  return table;
+}
+
+function buildExplainPanel(ex) {
+  const panel = document.createElement('details');
+  panel.className = 'explain-panel';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Why this fine?';
+  panel.appendChild(summary);
+  const body = document.createElement('div');
+  body.className = 'explain-body';
+  if (ex.match_method) {
+    const badge = document.createElement('span');
+    badge.className = 'explain-badge';
+    badge.textContent = String(ex.match_method).replace(/_/g, ' ');
+    body.appendChild(badge);
+  }
+  if (ex.reasoning) {
+    const p = document.createElement('p');
+    p.textContent = ex.reasoning;
+    body.appendChild(p);
+  }
+  const meta = document.createElement('div');
+  meta.className = 'explain-meta';
+  const parts = [];
+  if (ex.match_confidence) parts.push('confidence: ' + ex.match_confidence);
+  if (ex.fine_source) parts.push('fine source: ' + ex.fine_source);
+  if (parts.length) {
+    meta.textContent = parts.join(' · ');
+    body.appendChild(meta);
+  }
+  panel.appendChild(body);
+  return panel;
+}
+
+// ── Fine card ─────────────────────────────────────────────────────────────────
+function buildFineCard(fc, opts) {
+  opts = opts || {};
+  const card = document.createElement('div');
+  card.className = 'fine-card';
+
+  if (opts.updated) {
+    const pill = document.createElement('div');
+    pill.className = 'updated-pill';
+    const txt = document.createElement('span');
+    txt.textContent = 'UPDATED FOR NEW LOCATION';
+    pill.appendChild(txt);
+    if (opts.canRevert) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Revert';
+      btn.setAttribute('aria-label', 'Revert to previous location');
+      btn.addEventListener('click', () => { if (!busy) sendRevertLocation(); });
+      pill.appendChild(btn);
+    }
+    card.appendChild(pill);
+  }
+
+  const amount = fc.fine_first;
+  const amtEl  = document.createElement('div');
+  amtEl.className = 'fine-amount';
+  if (amount) {
+    const num = document.createElement('span');
+    num.className = 'fine-amount-num';
+    num.textContent = '₹0';
+    const lbl = document.createElement('span');
+    lbl.className = 'fine-label';
+    lbl.textContent = '1st offence';
+    amtEl.appendChild(num);
+    amtEl.appendChild(lbl);
+    animateCountUp(num, 0, Number(amount), 400);
+  } else {
+    const s = document.createElement('span');
+    s.style.cssText = 'font-size:13px;color:var(--t2);-webkit-text-fill-color:var(--t2);';
+    s.textContent = 'Amount varies — check RTO';
+    amtEl.appendChild(s);
+  }
+  card.appendChild(amtEl);
+
+  const meta = document.createElement('div');
+  meta.className = 'fine-meta';
+  const srcLabels = { city: 'City rate', state: 'State rate', central: 'Central rate', CENTRAL: 'Central rate' };
+  const src = fc.fine_source || (fc.state_code === 'CENTRAL' ? 'central' : 'state');
+  const compLabel = fc.compoundable ? 'Compoundable' : 'Court required';
+  const compCls   = fc.compoundable ? 'green' : 'red';
+  meta.innerHTML = `
+    <span class="badge blue">${srcLabels[src] || src}</span>
+    <span class="badge ${compCls}">${compLabel}</span>
+    ${fc.imprisonment ? '<span class="badge red">Jail possible</span>' : ''}
+    ${fc.licence_consequence ? '<span class="badge orange">DL impact</span>' : ''}
+  `;
+  card.appendChild(meta);
+
+  const hr = document.createElement('hr');
+  hr.className = 'fine-divider';
+  card.appendChild(hr);
+
+  const rows = [
+    ['Law',          fc.mv_section ? `MV Act §${fc.mv_section}` : null],
+    ['What to do',   fc.what_to_do_next],
+    ['Tip',          fc.tips_to_avoid],
+    ['DL impact',    fc.licence_consequence],
+    ['Juvenile note',fc.juvenile_surcharge],
+  ];
+  rows.forEach(([label, val]) => {
+    if (!val) return;
+    const d = document.createElement('div');
+    d.className = 'fine-row';
+    d.innerHTML = `<strong>${label}:</strong> ${esc(val)}`;
+    card.appendChild(d);
+  });
+
+  if (fc.fine_first && fc.fine_repeat && fc.fine_first !== fc.fine_repeat) {
+    const d = document.createElement('div');
+    d.className = 'fine-row';
+    d.style.marginTop = '5px';
+    d.innerHTML = `<strong>Repeat offence:</strong> ₹${Number(fc.fine_repeat).toLocaleString('en-IN')}`;
+    card.appendChild(d);
+  }
+
+  if (opts.diff && Object.keys(opts.diff).length) {
+    const d = opts.diff;
+    const lines = [];
+    if (d.fine_first) {
+      const fv = d.fine_first.from, tv = d.fine_first.to;
+      lines.push(`<span class="old">₹${fv ?? '—'}</span> → <span class="new">₹${tv ?? '—'}</span>`);
+    }
+    if (d.fine_source) {
+      lines.push(`<span class="old">${d.fine_source.from || '—'}</span> → <span class="new">${d.fine_source.to || '—'}</span>`);
+    }
+    if (lines.length) {
+      const dl = document.createElement('div');
+      dl.className = 'diff-line';
+      dl.innerHTML = '<strong>Change:</strong> ' + lines.join(' &middot; ');
+      card.appendChild(dl);
+    }
+  }
+
+  return card;
+}
+
+// ── Replay persisted messages ─────────────────────────────────────────────────
+function replayPersistedMessage(m) {
+  if (!m) return;
+  const role    = m.role || (m.type === 'user' ? 'user' : 'assistant');
+  const payload = m.payload || {};
+  const content = m.content || m.text || '';
+  if (role === 'user') {
+    if (!content) return;
+    const div = document.createElement('div');
+    div.className = 'msg user';
+    div.innerHTML = `<div class="bubble">${esc(content)}</div>`;
+    document.getElementById('messages').appendChild(div);
+    messageLog.push({ type: 'user', text: content });
+    return;
+  }
+  const entry = {
+    text:         content,
+    chips:        payload.chips || [],
+    slot:         payload.slot,
+    fine_card:    payload.fine_card || null,
+    detail_table: payload.detail_table || null,
+    diff:         payload.diff || null,
+    previous_fine_card: payload.previous_fine_card || null,
+    updated:      payload.intent === 'answer_updated',
+    canRevert:    payload.intent === 'answer_updated',
+  };
+  document.getElementById('messages').appendChild(renderBotBubble(entry));
+  messageLog.push({ type: 'bot', ...entry });
+}
+
+// ── Editable context strip ────────────────────────────────────────────────────
+const ROAD_LABELS = {
+  highway:   'Highway',
+  main_road: 'Main road',
+  street:    'Street',
+};
+const VEHICLE_LABELS = {
+  two_wheeler:       'Bike / Scooter',
+  four_wheeler:      'Car / SUV',
+  three_wheeler:     'Auto-rickshaw',
+  four_wheeler_plus: 'Bus / Minibus',
+  heavy_vehicle:     'Truck / LCV',
+};
+
+function updateCtxBar() {
+  const bar = document.getElementById('ctx-bar');
+  bar.innerHTML = '';
+  const s = lastSessionState || {};
+
+  const chips = [
+    { cls: 'state', icon: ICONS.pin,       label: s.state_code ? s.state_code : 'State',
+      empty: !s.state_code, action: openStatePicker },
+    { cls: 'state', icon: ICONS.pin,       label: s.city_name ? s.city_name : (s.city_code ? s.city_code : 'City'),
+      empty: !(s.city_name || s.city_code), action: openCityPicker },
+    { cls: 'road',  icon: ICONS.road,      label: s.road_bucket ? (ROAD_LABELS[s.road_bucket] || s.road_bucket) : 'Road',
+      empty: !s.road_bucket, action: openRoadPicker },
+    { cls: 'veh',   icon: ICONS.vehicle,   label: s.vehicle_segment ? (VEHICLE_LABELS[s.vehicle_segment] || s.vehicle_segment) : 'Vehicle',
+      empty: !s.vehicle_segment, action: openVehiclePicker },
+  ];
+
+  if (s.violation_code || s.violation_name) {
+    chips.push({
+      cls: 'viol', icon: ICONS.violation,
+      label: (s.last_fine_card && s.last_fine_card.violation_name) || s.violation_name || s.violation_code,
+      empty: false, action: openViolationPicker
+    });
+  }
+
+  chips.forEach(c => {
+    const el = document.createElement('span');
+    el.className = 'ctx-chip ' + c.cls + (c.empty ? ' empty' : '');
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.innerHTML = c.icon + esc(c.label) + ICONS.pencil;
+    el.addEventListener('click', () => { if (!busy) c.action(); });
+    el.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && !busy) { e.preventDefault(); c.action(); }
+    });
+    bar.appendChild(el);
+  });
+}
+
+function updateProgress() {
+  const s = lastSessionState || {};
+  const steps = [
+    { key: 'location',  label: 'Location',  done: !!(s.state_code) },
+    { key: 'road',      label: 'Road',      done: !!s.road_bucket },
+    { key: 'vehicle',   label: 'Vehicle',   done: !!s.vehicle_segment },
+    { key: 'violation', label: 'Violation', done: !!(s.violation_code) },
+  ];
+  let activeKey = null;
+  for (const st of steps) { if (!st.done) { activeKey = st.key; break; } }
+  const prog = document.getElementById('progress');
+  prog.innerHTML = '';
+  steps.forEach((st, i) => {
+    if (i) {
+      const sep = document.createElement('span');
+      sep.className = 'prog-sep';
+      sep.textContent = '·';
+      prog.appendChild(sep);
+    }
+    const node = document.createElement('span');
+    node.className = 'prog-step' + (st.done ? ' done' : (st.key === activeKey ? ' active' : ''));
+    const markHtml = st.done ? ICONS.check : (i + 1);
+    node.innerHTML = `<span class="mark" aria-hidden="true">${markHtml}</span><span>${st.label}</span>`;
+    prog.appendChild(node);
+  });
+}
+
+// ── Picker overlay ────────────────────────────────────────────────────────────
+const overlayEl        = document.getElementById('picker-overlay');
+const pickerTitle      = document.getElementById('picker-title');
+const pickerSub        = document.getElementById('picker-sub');
+const pickerFilter     = document.getElementById('picker-filter');
+const pickerFilterWrap = document.getElementById('picker-filter-wrap');
+const pickerChips      = document.getElementById('picker-chips');
+const modePickRow      = document.getElementById('mode-pick-row');
+
+document.getElementById('picker-close').addEventListener('click', closePicker);
+overlayEl.addEventListener('click', e => { if (e.target === overlayEl) closePicker(); });
+pickerFilter.addEventListener('input', renderPickerItems);
+
+function openPicker(title, items, onPick, opts) {
+  opts = opts || {};
+  pickerCtx = { items, onPick };
+  pickerTitle.textContent = title;
+  pickerFilter.value = '';
+  modePickRow.hidden = true;
+  pickerFilterWrap.hidden = false;
+  pickerChips.style.display = '';
+  if (opts.sub) { pickerSub.hidden = false; pickerSub.textContent = opts.sub; }
+  else { pickerSub.hidden = true; }
+  renderPickerItems();
+  overlayEl.classList.add('show');
+  setTimeout(() => pickerFilter.focus(), 100);
+}
+function closePicker() { overlayEl.classList.remove('show'); pickerCtx = null; }
+function renderPickerItems() {
+  if (!pickerCtx) return;
+  const q = pickerFilter.value.trim().toLowerCase();
+  pickerChips.innerHTML = '';
+  const matches = pickerCtx.items.filter(it => {
+    if (!q) return true;
+    const hay = (it.label || '') + ' ' + (it.id || '') + ' ' + (it.aliases ? it.aliases.join(' ') : '');
+    return hay.toLowerCase().includes(q);
+  });
+  if (!matches.length) {
+    const e = document.createElement('div');
+    e.className = 'picker-empty';
+    e.textContent = 'No matches.';
+    pickerChips.appendChild(e);
+    return;
+  }
+  const onPick = pickerCtx.onPick;
+  matches.slice(0, 200).forEach(it => {
+    const chip = document.createElement('button');
+    chip.className = 'picker-chip';
+    chip.textContent = it.label || it.id;
+    chip.addEventListener('click', () => { closePicker(); if (typeof onPick === 'function') onPick(it); });
+    pickerChips.appendChild(chip);
+  });
+}
+
+function openModePicker() {
+  pickerTitle.textContent = 'Start a new chat';
+  pickerSub.hidden = false;
+  pickerSub.textContent = 'Pick how you want to use DriveLegal:';
+  pickerFilterWrap.hidden = true;
+  pickerChips.style.display = 'none';
+  modePickRow.hidden = false;
+  modePickRow.innerHTML = '';
+  const opts = [
+    { id: 'static',  title: 'Calculator', icon: ICONS.calculator,
+      sub: 'Chip-led slot fill: pick state, vehicle, violation — get the exact fine card.' },
+    { id: 'dynamic', title: 'Chatbot', icon: ICONS.chatbot,
+      sub: 'Conversational: describe what happened — I\'ll figure out the rule and fine.' },
+  ];
+  opts.forEach(o => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'mode-pick-card';
+    card.innerHTML = `
+      <div class="pick-icon">${o.icon}</div>
+      <div class="pick-title">${o.title}</div>
+      <div class="pick-sub">${o.sub}</div>
+    `;
+    card.addEventListener('click', async () => {
+      closePicker();
+      sessionMode = o.id;
+      await startSession(o.id);
+      document.getElementById('messages').innerHTML = '';
+      messageLog = [];
+      lastSessionState = {};
+      updateCtxBar();
+      updateProgress();
+      showWelcome();
+    });
+    modePickRow.appendChild(card);
+  });
+  overlayEl.classList.add('show');
+}
+
+// ── Specific pickers ──────────────────────────────────────────────────────────
+async function openStatePicker() {
+  try {
+    const raw   = await getCatalog('/api/catalogs/states');
+    const items = normCatalog(raw).map(s => ({
+      id:      s.code || s.id || s.state_code,
+      label:   s.name ? `${s.name} (${s.code || s.id || ''})` : (s.code || s.id),
+      aliases: s.aliases || [],
+    }));
+    openPicker('Choose state', items, item => {
+      addUserBubble(item.label);
+      sendGeoManual({ state_code: item.id });
+    });
+  } catch (err) { showBotBubble('Could not load state list.'); console.error(err); }
+}
+async function openCityPicker() {
+  const stateCode = lastSessionState.state_code;
+  if (!stateCode) { showBotBubble('Pick a state first, then a city.'); return openStatePicker(); }
+  try {
+    const path  = `/api/catalogs/cities?state=${encodeURIComponent(stateCode)}`;
+    const raw   = await getCatalog(path);
+    const items = normCatalog(raw).map(c => ({
+      id: c.code || c.id || c.city_code, label: c.name || c.code || c.id, aliases: c.aliases || [],
+    }));
+    openPicker(`Choose city in ${stateCode}`, items, item => {
+      addUserBubble(item.label);
+      sendGeoManual({ city_code: item.id });
+    });
+  } catch (err) { showBotBubble('Could not load city list.'); console.error(err); }
+}
+function openRoadPicker() {
+  const items = [
+    { id: 'highway',   label: 'Highway — NH / SH / expressway' },
+    { id: 'main_road', label: 'Main road — arterial / city main road' },
+    { id: 'street',    label: 'Street — residential / colony lane' },
+  ];
+  openPicker('Choose road type', items, item => {
+    addUserBubble(item.label);
+    sendSlot('road_bucket', item.id);
+  });
+}
+async function openVehiclePicker() {
+  try {
+    const raw = await getCatalog('/api/catalogs/vehicles');
+    let items = normCatalog(raw).map(v => ({
+      id: v.id || v.segment || v.code,
+      label: v.label || v.name || VEHICLE_LABELS[v.id] || v.id,
+    }));
+    if (!items.length) items = Object.entries(VEHICLE_LABELS).map(([id, label]) => ({ id, label }));
+    openPicker('Choose vehicle', items, item => {
+      addUserBubble(item.label);
+      sendSlot('vehicle', item.id);
+    });
+  } catch (err) { showBotBubble('Could not load vehicle list.'); console.error(err); }
+}
+async function openViolationPicker() {
+  try {
+    const raw   = await getCatalog('/api/catalogs/violation_categories');
+    const items = normCatalog(raw).map(v => ({ id: v.id || v.code, label: v.label || v.name || v.id }));
+    openPicker('Choose violation category', items, item => {
+      addUserBubble(item.label);
+      sendSlot('violation_category', item.id);
+    });
+  } catch (err) { showBotBubble('Could not load violation list.'); console.error(err); }
+}
+
+// ── Geo-mode toggle ───────────────────────────────────────────────────────────
+document.getElementById('geo-toggle').addEventListener('change', async (e) => {
+  geoMode = e.target.checked ? 'map' : 'chat';
+  applyGeoModeUI();
+  if (!sessionId) await startSession();
+  try { await http('PUT', `/api/session/${sessionId}/geo_mode`, { mode: geoMode }); }
+  catch (err) { console.error(err); }
+  if (geoMode === 'chat') {
+    openStatePicker();
+  } else {
+    document.getElementById('pin-hint').classList.remove('hidden');
+  }
+});
+
+function applyGeoModeUI() {
+  const panel   = document.getElementById('map-panel');
+  const hint    = document.getElementById('geo-mode-hint');
+  const overlay = document.getElementById('geo-overlay');
+  if (geoMode === 'chat') {
+    panel.classList.add('collapsed');
+    hint.innerHTML = '<strong>Chat mode</strong> — answer via chips below';
+    overlay.classList.remove('show');
+  } else {
+    panel.classList.remove('collapsed');
+    hint.innerHTML = '<strong>Map mode</strong> — tap to drop a pin';
+    setTimeout(() => map.invalidateSize(), 260);
+  }
+}
+
+// ── Mode toggle (Calculator / Chatbot) ───────────────────────────────────────
+async function setMode(mode) {
+  if (mode === sessionMode) return;
+  if (!sessionId) { sessionMode = mode; applyModeUI(); return; }
+  try {
+    const data = await http('PUT', `/api/session/${sessionId}/mode`, { mode });
+    if (data && data.mode) sessionMode = data.mode;
+    applyModeUI();
+    if (data && data.reply) addBotBubble({ text: data.reply });
+  } catch (err) { console.error(err); }
+}
+function applyModeUI() {
+  const isStatic = sessionMode === 'static';
+  document.getElementById('mode-static').classList.toggle('active', isStatic);
+  document.getElementById('mode-static').setAttribute('aria-selected', isStatic);
+  document.getElementById('mode-dynamic').classList.toggle('active', !isStatic);
+  document.getElementById('mode-dynamic').setAttribute('aria-selected', !isStatic);
+  document.getElementById('msg-input').placeholder = inNarratePhase()
+    ? 'Tell me what happened…'
+    : sessionMode === 'dynamic'
+      ? 'Tell me about your road or location…'
+      : 'Type your message or tap a chip…';
+  positionSegThumb();
+}
+
+function inNarratePhase() {
+  if (sessionMode !== 'dynamic') return false;
+  const s = lastSessionState || {};
+  if (!s.state_code) return false;
+  if (s.geo_mode === 'chat' && !s.city_code) return false;
+  return true;
+}
+
+function positionSegThumb() {
+  const seg    = document.querySelector('.seg');
+  const thumb  = seg && seg.querySelector('.seg-thumb');
+  const active = seg && seg.querySelector('.seg-btn.active');
+  if (!thumb || !active) return;
+  if (active.offsetWidth === 0) { requestAnimationFrame(positionSegThumb); return; }
+  thumb.style.left  = active.offsetLeft + 'px';
+  thumb.style.width = active.offsetWidth + 'px';
+}
+window.addEventListener('resize', positionSegThumb);
+window.addEventListener('load',   positionSegThumb);
+requestAnimationFrame(positionSegThumb);
+
+document.getElementById('mode-static').addEventListener('click',  () => setMode('static'));
+document.getElementById('mode-dynamic').addEventListener('click', () => setMode('dynamic'));
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+document.getElementById('new-chat-btn').addEventListener('click', openModePicker);
+document.getElementById('sidebar-search').addEventListener('input', e => {
+  chatSearch = e.target.value.toLowerCase();
+  renderChatList();
+});
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-scrim').classList.toggle('show');
+});
+document.getElementById('sidebar-scrim').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-scrim').classList.remove('show');
+});
+
+async function refreshChatList() {
+  try {
+    const data = await http('GET', '/api/sessions');
+    chatList = data.sessions || [];
+    renderChatList();
+  } catch (err) { console.warn('refreshChatList failed', err); }
+}
+
+function renderChatList() {
+  const wrap = document.getElementById('chats-list');
+  wrap.innerHTML = '';
+  const q = chatSearch.trim();
+  const items = q
+    ? chatList.filter(c => (c.title || '').toLowerCase().includes(q) ||
+                           (c.last_snippet || '').toLowerCase().includes(q))
+    : chatList;
+  if (!items.length) {
+    const e = document.createElement('div');
+    e.className = 'sidebar-empty';
+    e.textContent = q ? 'No matching chats.' : 'No chats yet — start one above.';
+    wrap.appendChild(e);
+    return;
+  }
+  const sectionLabel = document.createElement('div');
+  sectionLabel.className = 'chats-section-label';
+  sectionLabel.textContent = q ? 'Search results' : 'Recent chats';
+  wrap.appendChild(sectionLabel);
+  items.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'chat-item' + (c.id === sessionId ? ' active' : '');
+    row.setAttribute('role', 'listitem');
+    row.dataset.sid = c.id;
+    const ago = relativeTime(c.updated_at);
+    const modeIcon = c.mode === 'dynamic' ? ICONS.bot : ICONS.calc;
+    row.innerHTML = `
+      <span class="title">${esc(c.title || 'New chat')}</span>
+      <button class="menu" aria-label="Delete chat">${ICONS.trash}</button>
+      <span class="meta">
+        <span class="mode-badge ${c.mode === 'dynamic' ? 'dynamic' : ''}">${modeIcon}${c.mode === 'dynamic' ? 'Bot' : 'Calc'}</span>
+        <span>${ago}</span>
+      </span>
+    `;
+    row.querySelector('.menu').addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      if (confirm(`Delete "${c.title || 'New chat'}"?`)) {
+        try {
+          await http('DELETE', `/api/sessions/${c.id}`);
+          if (c.id === sessionId) {
+            sessionId = null;
+            document.getElementById('messages').innerHTML = '';
+            messageLog = [];
+            lastSessionState = {};
+            updateCtxBar(); updateProgress();
+          }
+          await refreshChatList();
+        } catch (err) { console.error(err); }
+      }
+    });
+    row.addEventListener('click', () => loadSession(c.id));
+    wrap.appendChild(row);
+  });
+}
+
+function highlightActiveChat() {
+  document.querySelectorAll('.chat-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.sid === sessionId);
+  });
+}
+
+function relativeTime(ts) {
+  if (!ts) return '';
+  const diff = (Date.now() - ts) / 1000;
+  if (diff < 60)       return 'just now';
+  if (diff < 3600)     return Math.round(diff/60) + 'm ago';
+  if (diff < 86400)    return Math.round(diff/3600) + 'h ago';
+  if (diff < 86400*7)  return Math.round(diff/86400) + 'd ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+// ── Input row ─────────────────────────────────────────────────────────────────
+document.getElementById('send-btn').addEventListener('click', () => {
+  sendInput();
+  // Brief burst animation on the send button
+  const btn = document.getElementById('send-btn');
+  if (!PREFERS_REDUCED_MOTION) {
+    btn.classList.add('burst');
+    setTimeout(() => btn.classList.remove('burst'), 420);
+  }
+});
+document.getElementById('msg-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendInput(); }
+});
+function sendInput() {
+  const input = document.getElementById('msg-input');
+  const text  = input.value.trim();
+  if (!text || busy) return;
+  input.value = '';
+  addUserBubble(text);
+  sendTurn({ message: text });
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  if (sessionId) { try { await http('DELETE', `/api/session/${sessionId}`); } catch {} }
+  sessionId = null;
+  messageLog = [];
+  lastSessionState = {};
+  lastAskSlotSig = null;
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('ctx-bar').innerHTML = '';
+  document.getElementById('progress').innerHTML = '';
+  document.getElementById('geo-overlay').classList.remove('show');
+  document.getElementById('pin-hint').classList.remove('hidden');
+  if (mapMarker) { map.removeLayer(mapMarker); mapMarker = null; }
+  document.getElementById('geo-toggle').checked = true;
+  geoMode = 'map';
+  applyGeoModeUI();
+  await startSession(sessionMode);
+  showWelcome();
+  updateCtxBar();
+  updateProgress();
+});
+
+// ── Welcome bubble ────────────────────────────────────────────────────────────
+function showWelcome() {
+  if (sessionMode === 'dynamic') {
+    showBotBubble(
+      'Namaste. I\'m <strong>DriveLegal</strong> — your road-safety assistant. ' +
+      'Tell me what happened: what were you riding, what did the officer say, ' +
+      'any paperwork issues? I\'ll figure out the rule and fine for you.'
+    );
+  } else {
+    showBotBubble(
+      'Hi! I\'m <strong>DriveLegal</strong> — your offline Indian road law assistant.<br>' +
+      'Drop a pin on the map where the incident happened, or flip <em>Use map location</em> off to answer by chips.'
+    );
+  }
+}
+
+// ── Legacy migration ──────────────────────────────────────────────────────────
+async function migrateLegacyIfAny() {
+  let raw = null;
+  try { raw = localStorage.getItem(LEGACY_KEY); } catch { return; }
+  if (!raw) return;
+  try { JSON.parse(raw); } catch { return; }
+  try {
+    const data = await http('GET', '/api/sessions');
+    if (data && data.sessions && data.sessions.length) {
+      try { localStorage.removeItem(LEGACY_KEY); } catch {}
+      return;
+    }
+  } catch {}
+  try { localStorage.removeItem(LEGACY_KEY); } catch {}
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+async function bootstrap() {
+  await checkHealth();
+  await migrateLegacyIfAny();
+
+  let restoredSid = null;
+  try { restoredSid = localStorage.getItem(ACTIVE_SID_KEY); } catch {}
+  if (restoredSid) {
+    try {
+      await loadSession(restoredSid);
+      await refreshChatList();
+      if (sessionId) return;
+    } catch (err) { console.warn('Could not restore active session', err); }
+  }
+
+  try {
+    await startSession();
+  } catch (err) {
+    showBotBubble('Could not reach server. Start it and reload.');
+    console.error(err);
+    return;
+  }
+  showWelcome();
+  updateCtxBar();
+  updateProgress();
+}
+
+// ── Health badge ─────────────────────────────────────────────────────────────
+async function checkHealth() {
+  const badge = document.getElementById('health-badge');
+  try {
+    const h = await fetch(API + '/api/health').then(r => r.json());
+    serverOnline = true;
+    if (h.ready) {
+      badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>${h.model || 'ready'}`;
+      badge.className = 'ready';
+    } else if (h.ollama_ok) {
+      badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>model not pulled`;
+      badge.className = 'error';
+    } else {
+      badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>Ollama offline`;
+      badge.className = 'error';
+    }
+  } catch {
+    serverOnline = false;
+    // On-device engine still answers, so surface that instead of a dead end.
+    const canOffline = typeof DriveLegalOffline !== 'undefined';
+    badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>${canOffline ? 'On-device (offline)' : 'Server offline'}`;
+    badge.className = canOffline ? 'ready' : 'error';
+  }
+}
+
+// ── On-device offline fallback ────────────────────────────────────────────────
+function offlineActive() {
+  // Use the local engine when the device is offline OR the backend is down.
+  return (typeof DriveLegalOffline !== 'undefined') &&
+         (!navigator.onLine || !serverOnline);
+}
+
+function ensureLocalSession() {
+  // Offline we can't hit /api/sessions/new — mint a local id so history/UI work.
+  if (!sessionId) sessionId = 'local-' + Date.now();
+  return sessionId;
+}
+
+async function offlineTurn(text) {
+  ensureLocalSession();
+  return await DriveLegalOffline.localTurn(sessionId, lastSessionState || {}, text || '');
+}
+
+// ── Offline status strip ─────────────────────────────────────────────────────
+async function probeOfflineReady() {
+  if (!('caches' in window)) return;
+  try {
+    const keys     = await caches.keys();
+    const hasShell = keys.some(k => k.startsWith('drivelegal-shell'));
+    const hasApi   = keys.some(k => k.startsWith('drivelegal-api'));
+    const strip    = document.getElementById('status-strip');
+    const txt      = document.getElementById('status-text');
+    if (hasShell && hasApi) {
+      strip.classList.add('warm');
+      txt.textContent = 'Offline ready';
+    } else if (hasShell) {
+      strip.classList.add('warm');
+      txt.textContent = 'Shell cached';
+    } else {
+      txt.textContent = 'Online only';
+    }
+  } catch {}
+}
+
+// ── GPS auto-locate ──────────────────────────────────────────────────────────
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      if (geoMode !== 'map') return;
+      pinLat = pos.coords.latitude;
+      pinLng = pos.coords.longitude;
+      map.setView([pinLat, pinLng], 14);
+    },
+    () => map.setView([20.5937, 78.9629], 5)
+  );
+}
+
+// ── Service worker ───────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => setTimeout(probeOfflineReady, 700))
+      .catch(err => console.warn('SW registration failed', err));
+  });
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+bootstrap();
+</script>
+</body>
+</html>

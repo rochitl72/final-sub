@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background tile (matches app dark theme) -->
+  <rect width="512" height="512" rx="96" ry="96" fill="#0d0f18"/>
+
+  <!-- Trapezoid road with perspective -->
+  <path d="M150 460 L210 80 L302 80 L362 460 Z"
+        fill="#1e2133" stroke="#2b2f45" stroke-width="6"/>
+
+  <!-- Dashed centre line -->
+  <g stroke="#7e859e" stroke-width="10" stroke-linecap="round">
+    <line x1="256" y1="320" x2="256" y2="380"/>
+    <line x1="256" y1="240" x2="256" y2="290"/>
+  </g>
+
+  <!-- Map pin head -->
+  <circle cx="256" cy="170" r="80" fill="#4b8ef6"/>
+  <circle cx="256" cy="170" r="30" fill="#0d0f18"/>
+
+  <!-- Pin tail -->
+  <path d="M256 250 L226 215 L286 215 Z" fill="#4b8ef6"/>
+</svg>

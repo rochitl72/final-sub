@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveLegal — Knowledge Graph 3D</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#050d1a; color:#e2e8f0; font-family:'Inter','Segoe UI',sans-serif; overflow:hidden; }
+  #canvas-container { position:fixed; inset:0; }
+
+  /* ── Header ── */
+  #header {
+    position:fixed; top:0; left:0; right:0; z-index:20;
+    padding:16px 24px;
+    display:flex; align-items:center; justify-content:space-between;
+    background:linear-gradient(180deg,rgba(5,13,26,0.95) 0%,transparent 100%);
+    pointer-events:none;
+  }
+  #header h1 { font-size:20px; font-weight:700; letter-spacing:0.5px; color:#fff; }
+  #header h1 span { color:#3b82f6; }
+  #header .subtitle { font-size:12px; color:#64748b; margin-top:2px; }
+
+  /* ── Stats bar ── */
+  #stats {
+    position:fixed; top:0; right:24px; z-index:20;
+    display:flex; gap:20px; align-items:center;
+    padding-top:14px;
+    pointer-events:none;
+  }
+  .stat { text-align:center; }
+  .stat .val { font-size:18px; font-weight:700; color:#3b82f6; }
+  .stat .lbl { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
+
+  /* ── Legend ── */
+  #legend {
+    position:fixed; bottom:24px; left:24px; z-index:20;
+    background:rgba(5,13,26,0.88); border:1px solid rgba(59,130,246,0.2);
+    border-radius:12px; padding:14px 18px;
+    backdrop-filter:blur(10px);
+  }
+  #legend h3 { font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:10px; }
+  .leg-item { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:12px; color:#cbd5e1; }
+  .leg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  /* ── Controls ── */
+  #controls {
+    position:fixed; bottom:24px; right:24px; z-index:20;
+    display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+  }
+  .ctrl-btn {
+    background:rgba(5,13,26,0.88); border:1px solid rgba(59,130,246,0.3);
+    color:#93c5fd; font-size:12px; padding:7px 14px; border-radius:8px;
+    cursor:pointer; backdrop-filter:blur(10px); transition:all 0.2s;
+  }
+  .ctrl-btn:hover { border-color:#3b82f6; color:#fff; background:rgba(59,130,246,0.15); }
+  .ctrl-btn.active { background:rgba(59,130,246,0.25); border-color:#3b82f6; color:#fff; }
+
+  /* ── Search ── */
+  #search-box {
+    position:fixed; top:60px; left:50%; transform:translateX(-50%); z-index:20;
+    width:300px;
+  }
+  #search-input {
+    width:100%; padding:9px 14px 9px 36px;
+    background:rgba(5,13,26,0.9); border:1px solid rgba(59,130,246,0.3);
+    border-radius:10px; color:#e2e8f0; font-size:13px;
+    backdrop-filter:blur(10px); outline:none;
+    transition:border-color 0.2s;
+  }
+  #search-input::placeholder { color:#475569; }
+  #search-input:focus { border-color:#3b82f6; }
+  .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#475569; font-size:14px; pointer-events:none; }
+
+  /* ── Info panel ── */
+  #info-panel {
+    position:fixed; top:110px; right:24px; z-index:20;
+    width:290px;
+    background:rgba(5,13,26,0.92); border:1px solid rgba(59,130,246,0.3);
+    border-radius:14px; padding:18px;
+    backdrop-filter:blur(12px);
+    display:none;
+    transition:all 0.3s;
+  }
+  #info-panel.visible { display:block; }
+  #info-panel .type-badge {
+    font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px;
+    padding:3px 8px; border-radius:20px; display:inline-block; margin-bottom:10px;
+  }
+  #info-panel h2 { font-size:15px; font-weight:700; color:#fff; margin-bottom:8px; line-height:1.4; }
+  #info-panel .field { display:flex; gap:8px; margin-bottom:5px; font-size:12px; }
+  #info-panel .field .key { color:#64748b; min-width:80px; flex-shrink:0; }
+  #info-panel .field .val { color:#cbd5e1; }
+  #info-panel .desc { font-size:11px; color:#94a3b8; margin-top:8px; line-height:1.5; border-top:1px solid rgba(255,255,255,0.07); padding-top:8px; }
+  #close-info { float:right; background:none; border:none; color:#64748b; cursor:pointer; font-size:16px; line-height:1; }
+  #close-info:hover { color:#fff; }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position:fixed; z-index:30; pointer-events:none;
+    background:rgba(5,13,26,0.95); border:1px solid rgba(59,130,246,0.4);
+    border-radius:8px; padding:8px 12px; font-size:12px; color:#e2e8f0;
+    display:none; max-width:220px; line-height:1.5;
+    backdrop-filter:blur(8px);
+    box-shadow:0 0 20px rgba(59,130,246,0.2);
+  }
+  #tooltip .tt-type { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
+
+  /* ── Rotate indicator ── */
+  #rotate-hint {
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    font-size:11px; color:#334155; z-index:20; pointer-events:none;
+    animation: fadeout 4s forwards 3s;
+  }
+  @keyframes fadeout { to { opacity:0; } }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- Header -->
+<div id="header">
+  <div>
+    <h1>Drive<span>Legal</span> — Knowledge Graph</h1>
+    <div class="subtitle">Indian Motor Vehicles Act · 2443 nodes · 4701 edges</div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div id="stats">
+  <div class="stat"><div class="val">127</div><div class="lbl">Violations</div></div>
+  <div class="stat"><div class="val">36</div><div class="lbl">States</div></div>
+  <div class="stat"><div class="val">574</div><div class="lbl">Cities</div></div>
+  <div class="stat"><div class="val">702</div><div class="lbl">Fine Records</div></div>
+</div>
+
+<!-- Search -->
+<div id="search-box">
+  <span class="search-icon">⌕</span>
+  <input id="search-input" type="text" placeholder="Search nodes…" autocomplete="off">
+</div>
+
+<!-- Legend -->
+<div id="legend">
+  <h3>Node Types</h3>
+  <div class="leg-item"><div class="leg-dot" style="background:#ffffff;box-shadow:0 0 8px #fff"></div> Hub</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#f97316;box-shadow:0 0 6px #f97316"></div> Violation Group</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444"></div> Violation</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#60a5fa;box-shadow:0 0 6px #60a5fa"></div> State</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#a78bfa;box-shadow:0 0 6px #a78bfa"></div> City</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fbbf24;box-shadow:0 0 6px #fbbf24"></div> Road Class</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#34d399;box-shadow:0 0 6px #34d399"></div> Vehicle</div>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <button class="ctrl-btn active" id="btn-rotate">⟳ Auto-rotate</button>
+  <button class="ctrl-btn" id="btn-labels">◉ Labels</button>
+  <button class="ctrl-btn" id="btn-links">⌁ Edges</button>
+  <button class="ctrl-btn" id="btn-reset">⊹ Reset View</button>
+</div>
+
+<!-- Info Panel -->
+<div id="info-panel">
+  <button id="close-info">✕</button>
+  <div id="info-type" class="type-badge"></div>
+  <h2 id="info-name"></h2>
+  <div id="info-fields"></div>
+  <div id="info-desc" class="desc"></div>
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip">
+  <div id="tt-type" class="tt-type"></div>
+  <div id="tt-label"></div>
+</div>
+
+<div id="rotate-hint">🖱 Drag to rotate · Scroll to zoom · Click a node for details</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════════
+const GRAPH_DATA = {"nodes":[{"id":"hub","label":"DriveLegal\nGraph","type":"hub","group":"hub","size":28},{"id":"grp:highway_specific","label":"Highway Specific","type":"vio_group","group":"vio_group","size":16,"color":"#fbbf24","count":5},{"id":"vio:HWY_LANE_INDICATOR","label":"Failure to use turn-indicator on expressway","type":"violation","group":"highway_specific","size":5,"color":"#fbbf24","mv_section":"177A r/w CMVR 105","compoundable":false,"fine_count":1,"description":"Merging / overtaking without turn indicator on expressway."},{"id":"vio:HWY_STOP_ON_SHOULDER","label":"Stopping on highway shoulder / express lane","type":"violation","group":"highway_specific","size":5,"color":"#fbbf24","mv_section":null,"compoundable":true,"fine_count":5,"description":""},{"id":"vio:HWY_MIN_SPEED_VIOLATION","label":"Driving below minimum prescribed speed (expressway)","type":"violation","group":"highway_specific","size":5,"color":"#fbbf24","mv_section":null,"compoundable":true,"fine_count":1,"description":""},{"id":"vio:HWY_REVERSING_HIGHWAY","label":"Reversing on highway / expressway","type":"violation","group":"highway_specific","size":5,"color":"#fbbf24","mv_section":"184","compoundable":false,"fine_count":1,"description":""},{"id":"vio:HWY_TRUCK_LEFT_LANE","label":"Truck not using leftmost lane on expressway","type":"violation","group":"highway_specific","size":5,"color":"#fbbf24","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"grp:overloading_and_capacity","label":"Overloading And Capacity","type":"vio_group","group":"vio_group","size":16,"color":"#f43f5e","count":6},{"id":"vio:OVERLOAD_AXLE","label":"Overloading axle weight","type":"violation","group":"overloading_and_capacity","size":5,"color":"#f43f5e","mv_section":"113(3)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:OVERLOAD_PROJECTING_LOAD","label":"Goods projecting beyond permitted dimensions","type":"violation","group":"overloading_and_capacity","size":5,"color":"#f43f5e","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:OVERLOAD_ROOFTOP_LUGGAGE","label":"Unsecured rooftop / extra luggage beyond limits","type":"violation","group":"overloading_and_capacity","size":5,"color":"#f43f5e","mv_section":"194(1A)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:OVERLOAD_GOODS_WEIGHT","label":"Overloading a goods vehicle by weight","type":"violation","group":"overloading_and_capacity","size":5,"color":"#f43f5e","mv_section":"194(1)","compoundable":true,"fine_count":7,"description":""},{"id":"vio:OVERLOAD_PASSENGER","label":"Overloading of passenger vehicle","type":"violation","group":"overloading_and_capacity","size":5,"color":"#f43f5e","mv_section":"194A(1)","compoundable":true,"fine_count":3,"description":""},{"id":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","label":"Goods vehicle carrying passengers","type":"violation","group":"overloading_and_capacity","size":5,"color":"#f43f5e","mv_section":"66 r/w 192A","compoundable":false,"fine_count":1,"description":""},{"id":"grp:parking_and_stopping","label":"Parking And Stopping","type":"vio_group","group":"vio_group","size":16,"color":"#8b5cf6","count":9},{"id":"vio:PARK_DISABLED_SPOT","label":"Parking in disabled-reserved spot without permit","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":null,"compoundable":true,"fine_count":1,"description":""},{"id":"vio:PARK_FIRE_HYDRANT","label":"Parking blocking fire hydrant / emergency access","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":"122 / municipal bye-laws","compoundable":true,"fine_count":1,"description":""},{"id":"vio:PARK_ABANDONED","label":"Abandoned vehicle on road","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":"201","compoundable":true,"fine_count":1,"description":""},{"id":"vio:PARK_NO_PARKING","label":"Parking in no-parking zone","type":"violation","group":"parking_and_stopping","size":10,"color":"#8b5cf6","mv_section":"177 / 177A / municipal bye-laws","compoundable":true,"fine_count":34,"description":"Parking where prohibited."},{"id":"vio:PARK_NIGHT_NO_LIGHTS","label":"Parked vehicle without parking lights at night","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:PARK_FOOTPATH","label":"Parking on footpath / pedestrian area","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":"177A","compoundable":true,"fine_count":1,"description":""},{"id":"vio:PARK_BUS_STOP","label":"Parking at bus stop / taxi stand","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:PARK_DOUBLE_PARKING","label":"Double parking / parking away from kerb","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":"122","compoundable":true,"fine_count":1,"description":"Leaving a vehicle that causes obstruction."},{"id":"vio:PARK_EV_SPOT_MISUSE","label":"Non-EV parked in EV-reserved charging spot","type":"violation","group":"parking_and_stopping","size":5,"color":"#8b5cf6","mv_section":"177A r/w municipal bye-laws","compoundable":false,"fine_count":3,"description":"ICE vehicle occupying an EV-marked parking + charging bay. Primarily municipal-level penalty."},{"id":"grp:ev_specific","label":"Ev Specific","type":"vio_group","group":"vio_group","size":16,"color":"#22d3ee","count":4},{"id":"vio:EV_UNREG_RETROFIT","label":"Unauthorised ICE\u2192EV retrofit without RTO approval","type":"violation","group":"ev_specific","size":5,"color":"#22d3ee","mv_section":"52 r/w CMVR 126A","compoundable":false,"fine_count":1,"description":""},{"id":"vio:EV_FIRE_BATTERY_NONCOMPLIANT","label":"Use of non-AIS-156 compliant EV battery","type":"violation","group":"ev_specific","size":5,"color":"#22d3ee","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:EV_CHARGING_UNAUTH","label":"Charging EV at unauthorised / domestic outlet in public place","type":"violation","group":"ev_specific","size":5,"color":"#22d3ee","mv_section":null,"compoundable":true,"fine_count":1,"description":"Using a non-approved public socket or commercial electricity tap for EV charging on street / pavement."},{"id":"vio:EV_RESTRICTED_ZONE_VIOLATION","label":"Low-speed EV in restricted zone (e.g., highway)","type":"violation","group":"ev_specific","size":5,"color":"#22d3ee","mv_section":null,"compoundable":false,"fine_count":3,"description":""},{"id":"grp:lane_and_direction","label":"Lane And Direction","type":"vio_group","group":"vio_group","size":16,"color":"#06b6d4","count":8},{"id":"vio:DIR_WRONG_WAY","label":"Driving on wrong side / opposite lane","type":"violation","group":"lane_and_direction","size":7,"color":"#06b6d4","mv_section":"184(e) (dangerous driving)","compoundable":true,"fine_count":15,"description":"Driving against the flow of traffic on a one-way or divided road."},{"id":"vio:DIR_FAIL_TO_YIELD","label":"Failure to yield right of way","type":"violation","group":"lane_and_direction","size":5,"color":"#06b6d4","mv_section":"177A","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DIR_ILLEGAL_OVERTAKING","label":"Overtaking from wrong side / in no-overtaking zone","type":"violation","group":"lane_and_direction","size":5,"color":"#06b6d4","mv_section":"184(f)","compoundable":true,"fine_count":5,"description":"Overtaking on the left, on curves/bridges, or in no-overtaking zones."},{"id":"vio:DIR_LANE_DISCIPLINE","label":"Lane indiscipline / failing to keep to prescribed lane","type":"violation","group":"lane_and_direction","size":5,"color":"#06b6d4","mv_section":"177A r/w CMVR","compoundable":true,"fine_count":1,"description":"Not keeping to designated lane (e.g., truck lane, BRTS lane)."},{"id":"vio:DIR_BUS_TAXI_LANE","label":"Using dedicated bus/taxi lane in violation","type":"violation","group":"lane_and_direction","size":5,"color":"#06b6d4","mv_section":"177A","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DIR_NO_ENTRY","label":"Entering a no-entry zone","type":"violation","group":"lane_and_direction","size":5,"color":"#06b6d4","mv_section":"177A","compoundable":true,"fine_count":3,"description":"Entering area marked NO ENTRY (e.g., by time of day)."},{"id":"vio:DIR_NO_UTURN","label":"Taking a U-turn where prohibited","type":"violation","group":"lane_and_direction","size":5,"color":"#06b6d4","mv_section":"177A","compoundable":true,"fine_count":3,"description":"U-turn at a location marked NO U-TURN."},{"id":"vio:DIR_ONE_WAY_VIOLATION","label":"Entering one-way road from wrong direction","type":"violation","group":"lane_and_direction","size":5,"color":"#06b6d4","mv_section":"177A","compoundable":true,"fine_count":1,"description":"Violating one-way restriction."},{"id":"grp:safety_gear","label":"Safety Gear","type":"vio_group","group":"vio_group","size":16,"color":"#f97316","count":9},{"id":"vio:SAFETY_NO_HELMET_PILLION","label":"Pillion rider not wearing helmet","type":"violation","group":"safety_gear","size":5,"color":"#f97316","mv_section":"194D","compoundable":true,"fine_count":6,"description":""},{"id":"vio:SAFETY_NO_CHILD_RESTRAINT","label":"Child under 14 without helmet / child-restraint","type":"violation","group":"safety_gear","size":5,"color":"#f97316","mv_section":"194B(2) (CMVR 138A effective 2023)","compoundable":true,"fine_count":1,"description":""},{"id":"vio:SAFETY_NO_CHILD_2W","label":"Carrying child below 4 on 2W without safety harness + helmet","type":"violation","group":"safety_gear","size":9,"color":"#f97316","mv_section":"129 r/w CMVR 138A (notified 2022)","compoundable":true,"fine_count":27,"description":"Children below 4 must be secured with a safety harness and must wear a crash helmet; 2W speed capped at 40 km/h when car"},{"id":"vio:SAFETY_NO_SEATBELT_PASSENGER","label":"Passenger (incl. rear) not wearing seat belt","type":"violation","group":"safety_gear","size":5,"color":"#f97316","mv_section":"194B(1) (post-2022 enforcement)","compoundable":true,"fine_count":1,"description":""},{"id":"vio:SAFETY_NO_HELMET_RIDER","label":"Rider not wearing helmet","type":"violation","group":"safety_gear","size":14,"color":"#f97316","mv_section":"194D","compoundable":true,"fine_count":86,"description":"Two-wheeler rider without ISI-standard helmet."},{"id":"vio:SAFETY_NO_ADAS","label":"Disabling / removing mandated ADAS features","type":"violation","group":"safety_gear","size":5,"color":"#f97316","mv_section":"110 r/w CMVR r/w AIS-184","compoundable":false,"fine_count":1,"description":"Removing or disabling mandated ADAS in vehicles where it is phased-in mandatory (phased rollout 2025-27)."},{"id":"vio:SAFETY_NO_AIRBAG","label":"Selling / operating new LMV without dual front airbags","type":"violation","group":"safety_gear","size":5,"color":"#f97316","mv_section":"110 r/w CMVR 125B","compoundable":false,"fine_count":1,"description":"Post-Oct 2022 MoRTH notification \u2014 dual front airbags mandatory in all new LMVs (M1 category)."},{"id":"vio:SAFETY_NO_SEATBELT_DRIVER","label":"Driver not wearing seat belt","type":"violation","group":"safety_gear","size":10,"color":"#f97316","mv_section":"194B(1)","compoundable":true,"fine_count":34,"description":""},{"id":"vio:SAFETY_MORE_THAN_2_ON_2W","label":"More than 2 persons on a two-wheeler (triple riding)","type":"violation","group":"safety_gear","size":5,"color":"#f97316","mv_section":"128 r/w 177","compoundable":true,"fine_count":7,"description":""},{"id":"grp:pedestrian_and_vulnerable","label":"Pedestrian And Vulnerable","type":"vio_group","group":"vio_group","size":16,"color":"#0ea5e9","count":5},{"id":"vio:PED_ZEBRA_VIOLATION","label":"Not giving way to pedestrian at zebra crossing","type":"violation","group":"pedestrian_and_vulnerable","size":5,"color":"#0ea5e9","mv_section":"177A","compoundable":false,"fine_count":1,"description":""},{"id":"vio:PED_FOOTPATH_DRIVING","label":"Driving on pedestrian footpath","type":"violation","group":"pedestrian_and_vulnerable","size":5,"color":"#0ea5e9","mv_section":"184","compoundable":false,"fine_count":1,"description":""},{"id":"vio:PARK_ZEBRA_CROSSING","label":"Stopping on zebra crossing / pedestrian crossing","type":"violation","group":"pedestrian_and_vulnerable","size":5,"color":"#0ea5e9","mv_section":"177A","compoundable":false,"fine_count":1,"description":""},{"id":"vio:CYCLIST_DOORING","label":"Opening door unsafely into cyclist / vehicle path","type":"violation","group":"pedestrian_and_vulnerable","size":5,"color":"#0ea5e9","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:PED_SPLASHING_WATER","label":"Splashing water on pedestrians (state specific)","type":"violation","group":"pedestrian_and_vulnerable","size":5,"color":"#0ea5e9","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"grp:distracted_driving","label":"Distracted Driving","type":"vio_group","group":"vio_group","size":16,"color":"#f59e0b","count":3},{"id":"vio:DIST_HEADPHONES","label":"Driving while wearing headphones / both ears covered","type":"violation","group":"distracted_driving","size":5,"color":"#f59e0b","mv_section":"177A (state rules)","compoundable":true,"fine_count":1,"description":""},{"id":"vio:DIST_EATING_GROOMING","label":"Distracted driving (eating / grooming / other)","type":"violation","group":"distracted_driving","size":5,"color":"#f59e0b","mv_section":"184(c)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DIST_MOBILE_USE","label":"Using mobile phone while driving","type":"violation","group":"distracted_driving","size":14,"color":"#f59e0b","mv_section":"184(c) / 184(1)(c)","compoundable":true,"fine_count":55,"description":"Handheld mobile phone use. Hands-free navigation permitted."},{"id":"grp:impaired_driving","label":"Impaired Driving","type":"vio_group","group":"vio_group","size":16,"color":"#e11d48","count":4},{"id":"vio:DOC_DRIVING_MENTALLY_UNFIT","label":"Driving while mentally/physically unfit","type":"violation","group":"impaired_driving","size":5,"color":"#e11d48","mv_section":"186","compoundable":false,"fine_count":1,"description":"Driving in a state of unfit health (e.g., poor vision, sedation)."},{"id":"vio:IMPAIRED_DRUGS","label":"Driving under influence of drugs","type":"violation","group":"impaired_driving","size":5,"color":"#e11d48","mv_section":"185(b)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:IMPAIRED_REFUSE_TEST","label":"Refusing breath / blood test","type":"violation","group":"impaired_driving","size":5,"color":"#e11d48","mv_section":"203 / 204","compoundable":false,"fine_count":1,"description":""},{"id":"vio:IMPAIRED_DRUNK","label":"Drunk driving (BAC > 30 mg/100 ml blood)","type":"violation","group":"impaired_driving","size":7,"color":"#e11d48","mv_section":"185(a)","compoundable":false,"fine_count":15,"description":"Alcohol in blood exceeding 30 mg per 100 ml or influence such that driving is impaired."},{"id":"grp:commercial_and_permits","label":"Commercial And Permits","type":"vio_group","group":"vio_group","size":16,"color":"#6366f1","count":18},{"id":"vio:COMM_OVERSIZE_VEHICLE","label":"Operating oversized / non-standard commercial vehicle","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"182B","compoundable":false,"fine_count":1,"description":"Oversize vehicle plying without compliance."},{"id":"vio:COMM_METER_TAMPERING","label":"Fare meter tampering","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"177","compoundable":false,"fine_count":1,"description":""},{"id":"vio:FASTAG_TAMPERED","label":"Use of tampered / duplicate FASTag","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":null,"compoundable":false,"fine_count":7,"description":"Tampered, duplicate or unlinked FASTag. \u20b95,000\u201310,000 per instance (NHAI 2025 rules)."},{"id":"vio:COMM_AGGREGATOR_NO_LICENCE","label":"Aggregator operating without state licence","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"93 r/w Motor Vehicle Aggregator Guidelines 2020/2025","compoundable":true,"fine_count":9,"description":"Ola / Uber / Rapido etc. operating in a state without aggregator licence. \u20b925,000\u20131,00,000 per case + suspension."},{"id":"vio:COMM_SCHOOL_BUS_VIOLATION","label":"School bus safety norms violation","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"190 r/w state rules","compoundable":false,"fine_count":3,"description":"Missing CCTV/GPS, attendant, speed governor, yellow colour, first-aid."},{"id":"vio:FASTAG_MULTI_VEHICLE","label":"Same FASTag used across multiple vehicles","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":null,"compoundable":false,"fine_count":1,"description":"One FASTag transferred between vehicles \u2014 blacklisting + fine."},{"id":"vio:COMM_PERMIT_ROUTE_VIOLATION","label":"Route / area violation of permit","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"192A","compoundable":false,"fine_count":1,"description":""},{"id":"vio:SCHOOL_BUS_GPS_CAMERA","label":"School bus lacking CCTV + GPS + lady attendant","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"190 r/w state Safe School Rules","compoundable":false,"fine_count":1,"description":"Post-2016 SC directions on school bus safety \u2014 CCTV inside bus, GPS / VLT, lady attendant, distinct yellow livery, speed"},{"id":"vio:COMM_NO_PANIC_BUTTON","label":"Public transport without panic button (AIS-140)","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:COMM_NO_GPS_VLTS","label":"Commercial vehicle without GPS / VLTS (where mandated)","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"190 r/w AIS-140","compoundable":false,"fine_count":1,"description":""},{"id":"vio:COMM_NO_FARE_METER","label":"Taxi / auto without calibrated fare meter","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"67","compoundable":true,"fine_count":1,"description":""},{"id":"vio:COMM_REFUSAL","label":"Refusal of hire by auto / taxi","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"178(3)(b)","compoundable":true,"fine_count":1,"description":""},{"id":"vio:COMM_NO_BADGE","label":"Commercial driver without driver badge","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:COMM_RIDE_HAILING_REFUSAL","label":"App-based cab / auto refusing fare","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"178(3)(b)","compoundable":false,"fine_count":1,"description":"Refusal by a licensed aggregator driver \u2014 fine + possible de-platforming."},{"id":"vio:COMM_OVERCHARGE","label":"Overcharging by auto / taxi","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"178(3)(a)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:TOLL_EVASION","label":"Toll evasion (breaking barrier / forced lane change)","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":null,"compoundable":true,"fine_count":1,"description":"Evading payment at toll plaza. \u20b95,000 + penalty of toll arrears."},{"id":"vio:FASTAG_NONE","label":"No FASTag on National Highway toll plaza","type":"violation","group":"commercial_and_permits","size":14,"color":"#6366f1","mv_section":"NHAI rules r/w CMVR","compoundable":true,"fine_count":71,"description":"Entering a FASTag-only lane or toll plaza without a working FASTag. Double the standard user fee charged (NHAI 2021 rule"},{"id":"vio:COMM_NO_PERMIT","label":"Plying commercial vehicle without permit","type":"violation","group":"commercial_and_permits","size":5,"color":"#6366f1","mv_section":"192A(1)","compoundable":true,"fine_count":1,"description":""},{"id":"grp:accident_and_emergency","label":"Accident And Emergency","type":"vio_group","group":"vio_group","size":16,"color":"#ff6b35","count":7},{"id":"vio:ACC_CAUSING_DEATH","label":"Causing death by negligent driving","type":"violation","group":"accident_and_emergency","size":5,"color":"#ff6b35","mv_section":"184 r/w IPC 304A (BNS 106)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:EMERG_NO_WAY_TO_AMBULANCE","label":"Not making way for emergency vehicle (ambulance / fire)","type":"violation","group":"accident_and_emergency","size":5,"color":"#ff6b35","mv_section":"194E","compoundable":false,"fine_count":3,"description":""},{"id":"vio:ACC_NOT_REPORT","label":"Not reporting accident within 24 hours","type":"violation","group":"accident_and_emergency","size":5,"color":"#ff6b35","mv_section":"134","compoundable":true,"fine_count":1,"description":""},{"id":"vio:ACC_HIT_AND_RUN_RELATED","label":"Hit-and-run related offence (absconding)","type":"violation","group":"accident_and_emergency","size":5,"color":"#ff6b35","mv_section":"187","compoundable":false,"fine_count":1,"description":"Person in charge absconding after accident; compounding fee."},{"id":"vio:EMERG_OBSTRUCT_AMBULANCE","label":"Obstructing emergency vehicle","type":"violation","group":"accident_and_emergency","size":5,"color":"#ff6b35","mv_section":"194E","compoundable":false,"fine_count":1,"description":""},{"id":"vio:ACC_HIT_AND_RUN","label":"Leaving the scene of an accident (hit-and-run)","type":"violation","group":"accident_and_emergency","size":5,"color":"#ff6b35","mv_section":"161 r/w 187 / IPC 304A / 279","compoundable":false,"fine_count":1,"description":""},{"id":"vio:ACC_DRIVER_FATIGUE","label":"Commercial driver exceeding driving-hour limit","type":"violation","group":"accident_and_emergency","size":5,"color":"#ff6b35","mv_section":"91 r/w CMVR (for goods/passenger carriers)","compoundable":false,"fine_count":1,"description":"Continuous driving >8 hours / >48 hours a week for commercial drivers is prohibited."},{"id":"grp:juvenile_and_guardian","label":"Juvenile And Guardian","type":"vio_group","group":"vio_group","size":16,"color":"#ec4899","count":2},{"id":"vio:DOC_UNDERAGE","label":"Underage driving","type":"violation","group":"juvenile_and_guardian","size":5,"color":"#ec4899","mv_section":"4 r/w 181; 199A","compoundable":false,"fine_count":1,"description":"Driving by a person below the prescribed minimum age. Guardian held liable under Sec 199A."},{"id":"vio:JUV_MINOR_DRIVING","label":"Minor driving \u2013 guardian liability","type":"violation","group":"juvenile_and_guardian","size":5,"color":"#ec4899","mv_section":"199A","compoundable":false,"fine_count":1,"description":"Guardian & owner deemed guilty unless proven knowledge-absent."},{"id":"grp:speeding","label":"Speeding","type":"vio_group","group":"vio_group","size":16,"color":"#ef4444","count":4},{"id":"vio:SPEED_OVER_MMV_HMV","label":"Over-speeding (medium/heavy vehicle)","type":"violation","group":"speeding","size":5,"color":"#ef4444","mv_section":"183(1)(ii)","compoundable":true,"fine_count":4,"description":"Exceeding limit in MPV/HPV/MGV/HGV."},{"id":"vio:SPEED_EXCESSIVE_50PLUS","label":"Exceeding speed limit by more than 50%","type":"violation","group":"speeding","size":5,"color":"#ef4444","mv_section":"183(2)","compoundable":false,"fine_count":1,"description":"Very high over-speeding is an aggravated offence."},{"id":"vio:SPEED_IN_RESIDENTIAL_SCHOOL_ZONE","label":"Speeding in school / residential / silence zone","type":"violation","group":"speeding","size":5,"color":"#ef4444","mv_section":"183 r/w state rules","compoundable":true,"fine_count":1,"description":"Exceeding posted slower limit in school/residential/hospital zones."},{"id":"vio:SPEED_OVER_LMV","label":"Over-speeding (LMV / car / 2W / 3W)","type":"violation","group":"speeding","size":8,"color":"#ef4444","mv_section":"183(1)(i)","compoundable":true,"fine_count":23,"description":"Exceeding the prescribed speed limit in an LMV category vehicle."},{"id":"grp:modifications_and_compliance","label":"Modifications And Compliance","type":"vio_group","group":"vio_group","size":16,"color":"#a855f7","count":13},{"id":"vio:MOD_FAKE_NUMBER_PLATE","label":"Use of fake / copied number plate","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":"177 r/w CMVR 50; IPC/BNS 336/318","compoundable":false,"fine_count":7,"description":"Mounted fake / cloned number plate; also a cognizable offence under criminal law."},{"id":"vio:MOD_FANCY_NUMBERPLATE","label":"Stylised / fancy / illegible number plate font","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":true,"fine_count":1,"description":""},{"id":"vio:SPEED_GOVERNOR_TAMPER","label":"Tampering / disabling speed governor on commercial vehicle","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":"190 r/w CMVR 118","compoundable":false,"fine_count":1,"description":"Mandatory speed governors (40 km/h for school bus, 60/80 km/h for goods/contract carriers) disabled."},{"id":"vio:MOD_NO_REAR_REFLECTOR","label":"Missing rear reflectors / tail-lamp","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:MOD_NO_REARVIEW_MIRROR","label":"Missing rear-view mirror / indicators","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:MOD_BULL_BARS","label":"Use of bull-bars / crash-guards (banned)","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":"52 (MoRTH advisory 2017)","compoundable":true,"fine_count":1,"description":""},{"id":"vio:MOD_NO_HEADLIGHT_DRL","label":"Two-wheeler AHO (Always Headlight On) disabled post-Apr 2017","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:MOD_STRUCTURAL","label":"Unauthorised structural modification (chassis / engine / colour)","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":"52(1)","compoundable":true,"fine_count":1,"description":"Modifications not approved by RTO; colour change, engine swap, body-kit."},{"id":"vio:MOD_ILLEGAL_LED_HID","label":"Use of high-intensity / colour-changing lamps","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":true,"fine_count":1,"description":""},{"id":"vio:MOD_FOG_LAMP_FRONT_ROOF","label":"Auxiliary fog lamps on roof / bull-bar","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":false,"fine_count":1,"description":""},{"id":"vio:MOD_TINTED_GLASS","label":"Tinted glass below permissible VLT","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":true,"fine_count":1,"description":"Front/rear windscreen VLT < 70%, sides VLT < 50% (per Supreme Court 2012)."},{"id":"vio:MOD_LASER_JAMMER","label":"Installing radar / laser jammer or speed-camera detector","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":"52 r/w CMVR","compoundable":false,"fine_count":1,"description":"Vehicles fitted with radar / laser jammers or speed-camera detectors are illegal in India. Vehicle seized."},{"id":"vio:MOD_HSRP_MISSING","label":"Missing / non-HSRP high-security registration plate","type":"violation","group":"modifications_and_compliance","size":5,"color":"#a855f7","mv_section":null,"compoundable":true,"fine_count":3,"description":""},{"id":"grp:documents","label":"Documents","type":"vio_group","group":"vio_group","size":16,"color":"#3b82f6","count":12},{"id":"vio:DOC_FAKE_DL","label":"Using fake / tampered driving licence","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"182(2)","compoundable":false,"fine_count":1,"description":"Producing forged DL."},{"id":"vio:DOC_DISOBEY_AUTHORITY","label":"Disobeying orders of authorities / refusing information","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"179","compoundable":true,"fine_count":1,"description":"Refusing to stop or give information to a traffic officer."},{"id":"vio:DOC_NO_INSURANCE","label":"Driving without vehicle insurance","type":"violation","group":"documents","size":6,"color":"#3b82f6","mv_section":"196","compoundable":true,"fine_count":13,"description":"Using vehicle without at least third-party insurance cover."},{"id":"vio:DOC_UNAUTHORIZED_INTERFERENCE","label":"Unauthorised interference with vehicle (tampering)","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"198","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DOC_UNAUTHORIZED_USE_VEHICLE","label":"Allowing unauthorised / unlicensed driver","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"180","compoundable":false,"fine_count":1,"description":"Owner allowing a person without a valid DL to drive."},{"id":"vio:DOC_TAKING_VEHICLE_WITHOUT_AUTH","label":"Taking a vehicle without owner's authority","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"197","compoundable":false,"fine_count":1,"description":"Unauthorised use of someone else's vehicle."},{"id":"vio:DOC_NO_FITNESS","label":"Commercial vehicle without fitness certificate","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"56 r/w 192","compoundable":true,"fine_count":1,"description":"Transport vehicle plying without fitness certificate."},{"id":"vio:DOC_NO_DL","label":"Driving without valid driving licence","type":"violation","group":"documents","size":14,"color":"#3b82f6","mv_section":"181","compoundable":false,"fine_count":83,"description":"Driving a motor vehicle without holding an effective driving licence, or driving a class for which the licence is not en"},{"id":"vio:MISC_GENERAL","label":"General offence \u2013 no specific penalty","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"177","compoundable":false,"fine_count":5,"description":"Catch-all for violations without specific penalty."},{"id":"vio:DOC_DISQUALIFIED_DRIVING","label":"Driving while disqualified / DL suspended","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"182(1)","compoundable":false,"fine_count":1,"description":"Driving despite DL being disqualified or revoked."},{"id":"vio:DOC_EXPIRED_RC","label":"Driving with expired RC","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"192(1)","compoundable":true,"fine_count":1,"description":"RC expired and not renewed."},{"id":"vio:DOC_NO_RC","label":"Driving without registration certificate (RC)","type":"violation","group":"documents","size":5,"color":"#3b82f6","mv_section":"192(1)","compoundable":true,"fine_count":3,"description":"Using a motor vehicle without valid registration."},{"id":"grp:emission_and_noise","label":"Emission And Noise","type":"vio_group","group":"vio_group","size":16,"color":"#84cc16","count":8},{"id":"vio:NOISE_PRESSURE_HORN","label":"Use of pressure / multi-toned horn","type":"violation","group":"emission_and_noise","size":5,"color":"#84cc16","mv_section":null,"compoundable":true,"fine_count":9,"description":""},{"id":"vio:EMIT_POLLUTION_EXCEED","label":"Exceeding permissible emission (smoke / CO\u2082)","type":"violation","group":"emission_and_noise","size":5,"color":"#84cc16","mv_section":"190(2)","compoundable":true,"fine_count":1,"description":""},{"id":"vio:NOISE_MODIFIED_SILENCER","label":"Modified / aftermarket silencer (loud exhaust)","type":"violation","group":"emission_and_noise","size":5,"color":"#84cc16","mv_section":null,"compoundable":false,"fine_count":7,"description":""},{"id":"vio:EMIT_BS_NONCOMPLIANT","label":"Non-BS-VI compliant vehicle plying in banned zone","type":"violation","group":"emission_and_noise","size":5,"color":"#84cc16","mv_section":"190(2) r/w state notifications","compoundable":false,"fine_count":1,"description":""},{"id":"vio:NOISE_CONTINUOUS_HORN","label":"Unnecessary / continuous honking","type":"violation","group":"emission_and_noise","size":5,"color":"#84cc16","mv_section":"194F","compoundable":false,"fine_count":1,"description":""},{"id":"vio:NOISE_HORN_SILENT_ZONE","label":"Honking in silence zone (hospital / school)","type":"violation","group":"emission_and_noise","size":5,"color":"#84cc16","mv_section":"194F","compoundable":true,"fine_count":1,"description":""},{"id":"vio:DOC_NO_PUC","label":"Driving without Pollution Under Control (PUC) certificate","type":"violation","group":"emission_and_noise","size":6,"color":"#84cc16","mv_section":"190(2)","compoundable":true,"fine_count":11,"description":"Vehicle plying without valid PUC certificate."},{"id":"vio:EMIT_OLD_DIESEL_NCR","label":"Diesel vehicle >10 years / petrol >15 years plying in NCR/Delhi","type":"violation","group":"emission_and_noise","size":5,"color":"#84cc16","mv_section":"190(2) r/w NGT orders","compoundable":false,"fine_count":7,"description":""},{"id":"grp:signal_and_signage","label":"Signal And Signage","type":"vio_group","group":"vio_group","size":16,"color":"#10b981","count":3},{"id":"vio:SIGNAL_DISOBEY_SIGN","label":"Disobeying mandatory traffic sign","type":"violation","group":"signal_and_signage","size":5,"color":"#10b981","mv_section":"177A","compoundable":true,"fine_count":3,"description":"Ignoring STOP, GIVE WAY, NO HORN, NO ENTRY etc."},{"id":"vio:SIGNAL_RED_LIGHT_JUMPING","label":"Jumping a red traffic light","type":"violation","group":"signal_and_signage","size":9,"color":"#10b981","mv_section":"184(f) (treated as dangerous driving)","compoundable":true,"fine_count":25,"description":"Crossing a traffic signal when it is red."},{"id":"vio:SIGNAL_DISOBEY_POLICE_SIGNAL","label":"Disobeying a traffic police signal","type":"violation","group":"signal_and_signage","size":5,"color":"#10b981","mv_section":"179(1)","compoundable":true,"fine_count":1,"description":"Ignoring hand signals / whistle from police."},{"id":"grp:dangerous_driving","label":"Dangerous Driving","type":"vio_group","group":"vio_group","size":16,"color":"#dc2626","count":7},{"id":"vio:DANGER_RACING","label":"Racing / speed-trial on public road","type":"violation","group":"dangerous_driving","size":5,"color":"#dc2626","mv_section":"189","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DANGER_STUNT_WHEELIE","label":"Stunt riding / wheelie / drifting on public road","type":"violation","group":"dangerous_driving","size":5,"color":"#dc2626","mv_section":"184 / 189","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DANGER_CARRYING_HAZARDOUS","label":"Carrying hazardous goods without compliance","type":"violation","group":"dangerous_driving","size":5,"color":"#dc2626","mv_section":"190(3)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DIR_CUTTING_LANE","label":"Dangerous lane changing / zig-zag driving","type":"violation","group":"dangerous_driving","size":5,"color":"#dc2626","mv_section":"184","compoundable":false,"fine_count":1,"description":"Weaving through traffic."},{"id":"vio:DANGER_ROAD_RAGE","label":"Road rage / aggressive driving","type":"violation","group":"dangerous_driving","size":5,"color":"#dc2626","mv_section":"184 r/w IPC 279/504","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DANGER_UNSAFE_VEHICLE","label":"Driving a vehicle in unsafe condition","type":"violation","group":"dangerous_driving","size":5,"color":"#dc2626","mv_section":"189 / 190(1)","compoundable":false,"fine_count":1,"description":""},{"id":"vio:DANGER_RASH_DRIVING","label":"Rash / negligent driving","type":"violation","group":"dangerous_driving","size":5,"color":"#dc2626","mv_section":"184","compoundable":true,"fine_count":5,"description":"Driving in a manner dangerous to public."},{"id":"state:RJ","label":"Rajasthan","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"RJ","capital":"Jaipur","multiplier":0.9},{"id":"state:TR","label":"Tripura","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"TR","capital":"Agartala","multiplier":1.0},{"id":"state:LA","label":"Ladakh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"LA","capital":"Leh","multiplier":1.0},{"id":"state:CH","label":"Chandigarh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"CH","capital":"Chandigarh","multiplier":1.0},{"id":"state:AP","label":"Andhra Pradesh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"AP","capital":"Amaravati","multiplier":1.0},{"id":"state:NL","label":"Nagaland","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"NL","capital":"Kohima","multiplier":1.0},{"id":"state:TS","label":"Telangana","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"TS","capital":"Hyderabad","multiplier":1.0},{"id":"state:DN","label":"Dadra & Nagar Haveli and Daman & Diu","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"DD","capital":"Daman","multiplier":1.0},{"id":"state:UK","label":"Uttarakhand","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"UK","capital":"Dehradun","multiplier":1.0},{"id":"state:KL","label":"Kerala","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"KL","capital":"Thiruvananthapuram","multiplier":1.0},{"id":"state:PY","label":"Puducherry","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"PY","capital":"Puducherry","multiplier":1.0},{"id":"state:AN","label":"Andaman & Nicobar Islands","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"AN","capital":"Port Blair","multiplier":1.0},{"id":"state:SK","label":"Sikkim","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"SK","capital":"Gangtok","multiplier":1.0},{"id":"state:ML","label":"Meghalaya","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"ML","capital":"Shillong","multiplier":1.0},{"id":"state:KA","label":"Karnataka","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"KA","capital":"Bengaluru","multiplier":1.0},{"id":"state:HR","label":"Haryana","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"HR","capital":"Chandigarh (shared)","multiplier":1.0},{"id":"state:JK","label":"Jammu & Kashmir","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"JK","capital":"Srinagar / Jammu","multiplier":1.0},{"id":"state:JH","label":"Jharkhand","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"JH","capital":"Ranchi","multiplier":1.0},{"id":"state:UP","label":"Uttar Pradesh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"UP","capital":"Lucknow","multiplier":1.0},{"id":"state:GA","label":"Goa","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"GA","capital":"Panaji","multiplier":1.0},{"id":"state:PB","label":"Punjab","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"PB","capital":"Chandigarh (shared)","multiplier":1.0},{"id":"state:MZ","label":"Mizoram","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"MZ","capital":"Aizawl","multiplier":1.0},{"id":"state:BR","label":"Bihar","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"BR","capital":"Patna","multiplier":1.0},{"id":"state:MN","label":"Manipur","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"MN","capital":"Imphal","multiplier":1.0},{"id":"state:TN","label":"Tamil Nadu","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"TN","capital":"Chennai","multiplier":1.0},{"id":"state:HP","label":"Himachal Pradesh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"HP","capital":"Shimla","multiplier":1.0},{"id":"state:LD","label":"Lakshadweep","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"LD","capital":"Kavaratti","multiplier":1.0},{"id":"state:AS","label":"Assam","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"AS","capital":"Dispur","multiplier":1.0},{"id":"state:MP","label":"Madhya Pradesh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"MP","capital":"Bhopal","multiplier":1.0},{"id":"state:WB","label":"West Bengal","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"WB","capital":"Kolkata","multiplier":1.0},{"id":"state:GJ","label":"Gujarat","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"GJ","capital":"Gandhinagar","multiplier":0.1},{"id":"state:AR","label":"Arunachal Pradesh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"AR","capital":"Itanagar","multiplier":1.0},{"id":"state:DL","label":"Delhi (NCT)","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"DL","capital":"New Delhi","multiplier":1.0},{"id":"state:OD","label":"Odisha","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"OD","capital":"Bhubaneswar","multiplier":1.0},{"id":"state:CG","label":"Chhattisgarh","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"CG","capital":"Raipur","multiplier":1.0},{"id":"state:MH","label":"Maharashtra","type":"state","group":"state","size":10,"color":"#60a5fa","rto":"MH","capital":"Mumbai","multiplier":1.0},{"id":"road:URB_ST","label":"Urban Street / Residential Lan","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"street"},{"id":"road:FOREST","label":"Reserved / Protected Forest Ro","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"main_road"},{"id":"road:URB_ART","label":"Urban Arterial / City Main Roa","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"main_road"},{"id":"road:PROHIB","label":"Prohibited / No-Public-Access ","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"street"},{"id":"road:CANT","label":"Army Cantonment Road","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"street"},{"id":"road:MDR","label":"Major District Road (MDR)","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"main_road"},{"id":"road:PRIVATE","label":"Private / Gated Community / Ca","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"street"},{"id":"road:SCHOOL_ZONE","label":"School / Hospital / Silence Zo","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"street"},{"id":"road:ODR","label":"Other District / Rural / Villa","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"main_road"},{"id":"road:SH","label":"State Highway","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"main_road"},{"id":"road:EXP","label":"Expressway / Access-Controlled","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"highway"},{"id":"road:PORT","label":"Major Port / Port-Trust Area","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"street"},{"id":"road:TOLL_PLAZA","label":"Toll Plaza / Approach","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"highway"},{"id":"road:NH","label":"National Highway","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"highway"},{"id":"road:BORDER","label":"Border Road (BRO)","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"main_road"},{"id":"road:DEF","label":"Defence Establishment / Milita","type":"road","group":"road","size":9,"color":"#fbbf24","bucket":"street"},{"id":"veh:2W_MC_GEAR_LT175","label":"Motorcycle with gear up to 175cc","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"two_wheeler","fine_class":"2W"},{"id":"veh:SCHOOL_BUS","label":"School bus","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler_plus","fine_class":"HPV"},{"id":"veh:TRACTOR","label":"Agricultural tractor","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"special","fine_class":"TRACTOR"},{"id":"veh:3W_AUTO_GOODS","label":"Three-wheeler goods carrier","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"three_wheeler","fine_class":"3W_GOODS"},{"id":"veh:MPV_MINIBUS","label":"Medium Passenger Vehicle (minibus)","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler_plus","fine_class":"MPV"},{"id":"veh:3W_AUTO_PASS","label":"Three-wheeler passenger (auto-ricks","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"three_wheeler","fine_class":"3W_PASS"},{"id":"veh:3W_E_RICKSHAW","label":"E-rickshaw (battery operated, passe","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"three_wheeler","fine_class":"E_RICKSHAW"},{"id":"veh:2W_EV_LOWSPEED","label":"Low-speed electric two-wheeler (<=2","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"two_wheeler","fine_class":"2W_LOWSPEED_EV"},{"id":"veh:LMV_CAR_EV","label":"Light Motor Vehicle \u2013 Electric car ","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler","fine_class":"LMV"},{"id":"veh:HGV_TRUCK","label":"Heavy Goods Vehicle (>12000 kg)","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"heavy_vehicle","fine_class":"HGV"},{"id":"veh:HGV_TRAILER","label":"Articulated truck / trailer","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"heavy_vehicle","fine_class":"HGV"},{"id":"veh:FIRE_TRUCK","label":"Fire brigade vehicle","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"emergency","fine_class":"HPV"},{"id":"veh:LMV_TAXI","label":"Light Motor Vehicle \u2013 Taxi / cab","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler","fine_class":"LMV_TR"},{"id":"veh:3W_E_CART","label":"E-cart (battery operated, goods)","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"three_wheeler","fine_class":"E_RICKSHAW"},{"id":"veh:MGV","label":"Medium Goods Vehicle (7500\u201312000 kg","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"heavy_vehicle","fine_class":"MGV"},{"id":"veh:2W_MC_GEAR","label":"Motorcycle with gear","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"two_wheeler","fine_class":"2W"},{"id":"veh:CONSTRUCTION_EQUIP","label":"Construction equipment vehicle (CEV","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"special","fine_class":"CEV"},{"id":"veh:HPV_BUS","label":"Heavy Passenger Vehicle (bus)","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler_plus","fine_class":"HPV"},{"id":"veh:2W_MOPED_50CC","label":"Moped up to 50cc","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"two_wheeler","fine_class":"2W"},{"id":"veh:LMV_GOODS","label":"Light Goods Vehicle (<=7500 kg)","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler","fine_class":"LGV"},{"id":"veh:QUADRICYCLE","label":"Quadricycle (e.g., Bajaj Qute)","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler","fine_class":"LMV"},{"id":"veh:AMBULANCE","label":"Ambulance / emergency vehicle","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"emergency","fine_class":"LMV_TR"},{"id":"veh:LMV_CAR_PVT","label":"Light Motor Vehicle \u2013 Private car","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"four_wheeler","fine_class":"LMV"},{"id":"veh:POLICE_VEHICLE","label":"Police vehicle (official duty)","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"emergency","fine_class":"LMV"},{"id":"veh:2W_SCOOTER","label":"Scooter / motorcycle without gear","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"two_wheeler","fine_class":"2W"},{"id":"veh:2W_EV","label":"Electric two-wheeler (battery > 250","type":"vehicle","group":"vehicle","size":8,"color":"#34d399","segment":"two_wheeler","fine_class":"2W"},{"id":"city:IND","label":"Indore","type":"city","group":"city","size":6,"color":"#a78bfa","state":"MP","lat":22.7196,"lng":75.8577},{"id":"city:TVM","label":"Thiruvananthapuram","type":"city","group":"city","size":6,"color":"#a78bfa","state":"KL","lat":8.5241,"lng":76.9366},{"id":"city:KNP","label":"Kanpur","type":"city","group":"city","size":6,"color":"#a78bfa","state":"UP","lat":null,"lng":null},{"id":"city:NSK","label":"Nashik","type":"city","group":"city","size":6,"color":"#a78bfa","state":"MH","lat":null,"lng":null},{"id":"city:DDN","label":"Dehradun","type":"city","group":"city","size":6,"color":"#a78bfa","state":"UK","lat":null,"lng":null},{"id":"city:AMD","label":"Amritsar","type":"city","group":"city","size":6,"color":"#a78bfa","state":"PB","lat":31.634,"lng":74.8723},{"id":"city:MDU","label":"Madurai","type":"city","group":"city","size":6,"color":"#a78bfa","state":"TN","lat":null,"lng":null},{"id":"city:BLR","label":"Bengaluru (Bruhat Bengaluru)","type":"city","group":"city","size":6,"color":"#a78bfa","state":"KA","lat":12.9716,"lng":77.5946},{"id":"city:JAI","label":"Jaipur","type":"city","group":"city","size":6,"color":"#a78bfa","state":"RJ","lat":26.9124,"lng":75.7873},{"id":"city:RAN","label":"Ranchi","type":"city","group":"city","size":6,"color":"#a78bfa","state":"JH","lat":null,"lng":null},{"id":"city:HYD","label":"Hyderabad","type":"city","group":"city","size":6,"color":"#a78bfa","state":"TS","lat":17.385,"lng":78.4867},{"id":"city:GUW","label":"Guwahati","type":"city","group":"city","size":6,"color":"#a78bfa","state":"AS","lat":null,"lng":null},{"id":"city:BBN","label":"Bhubaneswar","type":"city","group":"city","size":6,"color":"#a78bfa","state":"OD","lat":20.2961,"lng":85.8245},{"id":"city:CHD","label":"Chandigarh","type":"city","group":"city","size":6,"color":"#a78bfa","state":"CH","lat":null,"lng":null},{"id":"city:VAD","label":"Vadodara","type":"city","group":"city","size":6,"color":"#a78bfa","state":"GJ","lat":null,"lng":null},{"id":"city:PAT","label":"Patna","type":"city","group":"city","size":6,"color":"#a78bfa","state":"BR","lat":25.5941,"lng":85.1376},{"id":"city:DEL","label":"Delhi (New Delhi / NCT)","type":"city","group":"city","size":6,"color":"#a78bfa","state":"DL","lat":28.6139,"lng":77.209},{"id":"city:VIZ","label":"Visakhapatnam","type":"city","group":"city","size":6,"color":"#a78bfa","state":"AP","lat":null,"lng":null},{"id":"city:KOL","label":"Kolkata","type":"city","group":"city","size":6,"color":"#a78bfa","state":"WB","lat":22.5726,"lng":88.3639},{"id":"city:GNR","label":"Gurugram","type":"city","group":"city","size":6,"color":"#a78bfa","state":"HR","lat":28.4595,"lng":77.0266},{"id":"city:PBR","label":"Port Blair","type":"city","group":"city","size":6,"color":"#a78bfa","state":"AN","lat":11.6234,"lng":92.7265},{"id":"city:SRN","label":"Srinagar","type":"city","group":"city","size":6,"color":"#a78bfa","state":"JK","lat":34.0837,"lng":74.7973},{"id":"city:LEH","label":"Leh","type":"city","group":"city","size":6,"color":"#a78bfa","state":"LA","lat":34.1526,"lng":77.5771},{"id":"city:SHL","label":"Shillong","type":"city","group":"city","size":6,"color":"#a78bfa","state":"ML","lat":25.5788,"lng":91.8933},{"id":"city:KOH","label":"Kohima","type":"city","group":"city","size":6,"color":"#a78bfa","state":"NL","lat":25.6751,"lng":94.1086},{"id":"city:IMP","label":"Imphal","type":"city","group":"city","size":6,"color":"#a78bfa","state":"MN","lat":24.6637,"lng":93.9368},{"id":"city:AGT","label":"Agartala","type":"city","group":"city","size":6,"color":"#a78bfa","state":"TR","lat":23.8315,"lng":91.2868},{"id":"city:AIZ","label":"Aizawl","type":"city","group":"city","size":6,"color":"#a78bfa","state":"MZ","lat":23.7271,"lng":92.9376},{"id":"city:ITA","label":"Itanagar","type":"city","group":"city","size":6,"color":"#a78bfa","state":"AR","lat":27.0844,"lng":93.6053},{"id":"city:GTK","label":"Gangtok","type":"city","group":"city","size":6,"color":"#a78bfa","state":"SK","lat":27.3389,"lng":88.6139},{"id":"city:PAN","label":"Panaji","type":"city","group":"city","size":6,"color":"#a78bfa","state":"GA","lat":15.4909,"lng":73.8278},{"id":"city:SHM","label":"Shimla","type":"city","group":"city","size":6,"color":"#a78bfa","state":"HP","lat":31.1048,"lng":77.1734},{"id":"city:PDY","label":"Puducherry","type":"city","group":"city","size":6,"color":"#a78bfa","state":"PY","lat":11.9416,"lng":79.8083},{"id":"city:RPR","label":"Raipur","type":"city","group":"city","size":6,"color":"#a78bfa","state":"CG","lat":21.2514,"lng":81.6296},{"id":"city:KAV","label":"Kavaratti","type":"city","group":"city","size":6,"color":"#a78bfa","state":"LD","lat":10.5626,"lng":72.6369},{"id":"city:SLV","label":"Silvassa","type":"city","group":"city","size":6,"color":"#a78bfa","state":"DN","lat":20.2737,"lng":73.0169},{"id":"city:DIU","label":"Daman","type":"city","group":"city","size":6,"color":"#a78bfa","state":"DD","lat":20.3974,"lng":72.8328}],"links":[{"source":"hub","target":"grp:highway_specific","type":"group_link"},{"source":"grp:highway_specific","target":"vio:HWY_LANE_INDICATOR","type":"vio_link"},{"source":"grp:highway_specific","target":"vio:HWY_STOP_ON_SHOULDER","type":"vio_link"},{"source":"grp:highway_specific","target":"vio:HWY_MIN_SPEED_VIOLATION","type":"vio_link"},{"source":"grp:highway_specific","target":"vio:HWY_REVERSING_HIGHWAY","type":"vio_link"},{"source":"grp:highway_specific","target":"vio:HWY_TRUCK_LEFT_LANE","type":"vio_link"},{"source":"hub","target":"grp:overloading_and_capacity","type":"group_link"},{"source":"grp:overloading_and_capacity","target":"vio:OVERLOAD_AXLE","type":"vio_link"},{"source":"grp:overloading_and_capacity","target":"vio:OVERLOAD_PROJECTING_LOAD","type":"vio_link"},{"source":"grp:overloading_and_capacity","target":"vio:OVERLOAD_ROOFTOP_LUGGAGE","type":"vio_link"},{"source":"grp:overloading_and_capacity","target":"vio:OVERLOAD_GOODS_WEIGHT","type":"vio_link"},{"source":"grp:overloading_and_capacity","target":"vio:OVERLOAD_PASSENGER","type":"vio_link"},{"source":"grp:overloading_and_capacity","target":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","type":"vio_link"},{"source":"hub","target":"grp:parking_and_stopping","type":"group_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_DISABLED_SPOT","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_FIRE_HYDRANT","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_ABANDONED","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_NO_PARKING","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_NIGHT_NO_LIGHTS","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_FOOTPATH","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_BUS_STOP","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_DOUBLE_PARKING","type":"vio_link"},{"source":"grp:parking_and_stopping","target":"vio:PARK_EV_SPOT_MISUSE","type":"vio_link"},{"source":"hub","target":"grp:ev_specific","type":"group_link"},{"source":"grp:ev_specific","target":"vio:EV_UNREG_RETROFIT","type":"vio_link"},{"source":"grp:ev_specific","target":"vio:EV_FIRE_BATTERY_NONCOMPLIANT","type":"vio_link"},{"source":"grp:ev_specific","target":"vio:EV_CHARGING_UNAUTH","type":"vio_link"},{"source":"grp:ev_specific","target":"vio:EV_RESTRICTED_ZONE_VIOLATION","type":"vio_link"},{"source":"hub","target":"grp:lane_and_direction","type":"group_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_WRONG_WAY","type":"vio_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_FAIL_TO_YIELD","type":"vio_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_ILLEGAL_OVERTAKING","type":"vio_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_LANE_DISCIPLINE","type":"vio_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_BUS_TAXI_LANE","type":"vio_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_NO_ENTRY","type":"vio_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_NO_UTURN","type":"vio_link"},{"source":"grp:lane_and_direction","target":"vio:DIR_ONE_WAY_VIOLATION","type":"vio_link"},{"source":"hub","target":"grp:safety_gear","type":"group_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_HELMET_PILLION","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_CHILD_RESTRAINT","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_CHILD_2W","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_SEATBELT_PASSENGER","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_HELMET_RIDER","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_ADAS","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_AIRBAG","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_NO_SEATBELT_DRIVER","type":"vio_link"},{"source":"grp:safety_gear","target":"vio:SAFETY_MORE_THAN_2_ON_2W","type":"vio_link"},{"source":"hub","target":"grp:pedestrian_and_vulnerable","type":"group_link"},{"source":"grp:pedestrian_and_vulnerable","target":"vio:PED_ZEBRA_VIOLATION","type":"vio_link"},{"source":"grp:pedestrian_and_vulnerable","target":"vio:PED_FOOTPATH_DRIVING","type":"vio_link"},{"source":"grp:pedestrian_and_vulnerable","target":"vio:PARK_ZEBRA_CROSSING","type":"vio_link"},{"source":"grp:pedestrian_and_vulnerable","target":"vio:CYCLIST_DOORING","type":"vio_link"},{"source":"grp:pedestrian_and_vulnerable","target":"vio:PED_SPLASHING_WATER","type":"vio_link"},{"source":"hub","target":"grp:distracted_driving","type":"group_link"},{"source":"grp:distracted_driving","target":"vio:DIST_HEADPHONES","type":"vio_link"},{"source":"grp:distracted_driving","target":"vio:DIST_EATING_GROOMING","type":"vio_link"},{"source":"grp:distracted_driving","target":"vio:DIST_MOBILE_USE","type":"vio_link"},{"source":"hub","target":"grp:impaired_driving","type":"group_link"},{"source":"grp:impaired_driving","target":"vio:DOC_DRIVING_MENTALLY_UNFIT","type":"vio_link"},{"source":"grp:impaired_driving","target":"vio:IMPAIRED_DRUGS","type":"vio_link"},{"source":"grp:impaired_driving","target":"vio:IMPAIRED_REFUSE_TEST","type":"vio_link"},{"source":"grp:impaired_driving","target":"vio:IMPAIRED_DRUNK","type":"vio_link"},{"source":"hub","target":"grp:commercial_and_permits","type":"group_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_OVERSIZE_VEHICLE","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_METER_TAMPERING","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:FASTAG_TAMPERED","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_AGGREGATOR_NO_LICENCE","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_SCHOOL_BUS_VIOLATION","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:FASTAG_MULTI_VEHICLE","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_PERMIT_ROUTE_VIOLATION","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:SCHOOL_BUS_GPS_CAMERA","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_NO_PANIC_BUTTON","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_NO_GPS_VLTS","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_NO_FARE_METER","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_REFUSAL","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_NO_BADGE","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_RIDE_HAILING_REFUSAL","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_OVERCHARGE","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:TOLL_EVASION","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:FASTAG_NONE","type":"vio_link"},{"source":"grp:commercial_and_permits","target":"vio:COMM_NO_PERMIT","type":"vio_link"},{"source":"hub","target":"grp:accident_and_emergency","type":"group_link"},{"source":"grp:accident_and_emergency","target":"vio:ACC_CAUSING_DEATH","type":"vio_link"},{"source":"grp:accident_and_emergency","target":"vio:EMERG_NO_WAY_TO_AMBULANCE","type":"vio_link"},{"source":"grp:accident_and_emergency","target":"vio:ACC_NOT_REPORT","type":"vio_link"},{"source":"grp:accident_and_emergency","target":"vio:ACC_HIT_AND_RUN_RELATED","type":"vio_link"},{"source":"grp:accident_and_emergency","target":"vio:EMERG_OBSTRUCT_AMBULANCE","type":"vio_link"},{"source":"grp:accident_and_emergency","target":"vio:ACC_HIT_AND_RUN","type":"vio_link"},{"source":"grp:accident_and_emergency","target":"vio:ACC_DRIVER_FATIGUE","type":"vio_link"},{"source":"hub","target":"grp:juvenile_and_guardian","type":"group_link"},{"source":"grp:juvenile_and_guardian","target":"vio:DOC_UNDERAGE","type":"vio_link"},{"source":"grp:juvenile_and_guardian","target":"vio:JUV_MINOR_DRIVING","type":"vio_link"},{"source":"hub","target":"grp:speeding","type":"group_link"},{"source":"grp:speeding","target":"vio:SPEED_OVER_MMV_HMV","type":"vio_link"},{"source":"grp:speeding","target":"vio:SPEED_EXCESSIVE_50PLUS","type":"vio_link"},{"source":"grp:speeding","target":"vio:SPEED_IN_RESIDENTIAL_SCHOOL_ZONE","type":"vio_link"},{"source":"grp:speeding","target":"vio:SPEED_OVER_LMV","type":"vio_link"},{"source":"hub","target":"grp:modifications_and_compliance","type":"group_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_FAKE_NUMBER_PLATE","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_FANCY_NUMBERPLATE","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:SPEED_GOVERNOR_TAMPER","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_NO_REAR_REFLECTOR","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_NO_REARVIEW_MIRROR","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_BULL_BARS","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_NO_HEADLIGHT_DRL","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_STRUCTURAL","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_ILLEGAL_LED_HID","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_FOG_LAMP_FRONT_ROOF","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_TINTED_GLASS","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_LASER_JAMMER","type":"vio_link"},{"source":"grp:modifications_and_compliance","target":"vio:MOD_HSRP_MISSING","type":"vio_link"},{"source":"hub","target":"grp:documents","type":"group_link"},{"source":"grp:documents","target":"vio:DOC_FAKE_DL","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_DISOBEY_AUTHORITY","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_NO_INSURANCE","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_UNAUTHORIZED_INTERFERENCE","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_UNAUTHORIZED_USE_VEHICLE","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_TAKING_VEHICLE_WITHOUT_AUTH","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_NO_FITNESS","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_NO_DL","type":"vio_link"},{"source":"grp:documents","target":"vio:MISC_GENERAL","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_DISQUALIFIED_DRIVING","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_EXPIRED_RC","type":"vio_link"},{"source":"grp:documents","target":"vio:DOC_NO_RC","type":"vio_link"},{"source":"hub","target":"grp:emission_and_noise","type":"group_link"},{"source":"grp:emission_and_noise","target":"vio:NOISE_PRESSURE_HORN","type":"vio_link"},{"source":"grp:emission_and_noise","target":"vio:EMIT_POLLUTION_EXCEED","type":"vio_link"},{"source":"grp:emission_and_noise","target":"vio:NOISE_MODIFIED_SILENCER","type":"vio_link"},{"source":"grp:emission_and_noise","target":"vio:EMIT_BS_NONCOMPLIANT","type":"vio_link"},{"source":"grp:emission_and_noise","target":"vio:NOISE_CONTINUOUS_HORN","type":"vio_link"},{"source":"grp:emission_and_noise","target":"vio:NOISE_HORN_SILENT_ZONE","type":"vio_link"},{"source":"grp:emission_and_noise","target":"vio:DOC_NO_PUC","type":"vio_link"},{"source":"grp:emission_and_noise","target":"vio:EMIT_OLD_DIESEL_NCR","type":"vio_link"},{"source":"hub","target":"grp:signal_and_signage","type":"group_link"},{"source":"grp:signal_and_signage","target":"vio:SIGNAL_DISOBEY_SIGN","type":"vio_link"},{"source":"grp:signal_and_signage","target":"vio:SIGNAL_RED_LIGHT_JUMPING","type":"vio_link"},{"source":"grp:signal_and_signage","target":"vio:SIGNAL_DISOBEY_POLICE_SIGNAL","type":"vio_link"},{"source":"hub","target":"grp:dangerous_driving","type":"group_link"},{"source":"grp:dangerous_driving","target":"vio:DANGER_RACING","type":"vio_link"},{"source":"grp:dangerous_driving","target":"vio:DANGER_STUNT_WHEELIE","type":"vio_link"},{"source":"grp:dangerous_driving","target":"vio:DANGER_CARRYING_HAZARDOUS","type":"vio_link"},{"source":"grp:dangerous_driving","target":"vio:DIR_CUTTING_LANE","type":"vio_link"},{"source":"grp:dangerous_driving","target":"vio:DANGER_ROAD_RAGE","type":"vio_link"},{"source":"grp:dangerous_driving","target":"vio:DANGER_UNSAFE_VEHICLE","type":"vio_link"},{"source":"grp:dangerous_driving","target":"vio:DANGER_RASH_DRIVING","type":"vio_link"},{"source":"hub","target":"state:RJ","type":"state_link"},{"source":"hub","target":"state:TR","type":"state_link"},{"source":"hub","target":"state:LA","type":"state_link"},{"source":"hub","target":"state:CH","type":"state_link"},{"source":"hub","target":"state:AP","type":"state_link"},{"source":"hub","target":"state:NL","type":"state_link"},{"source":"hub","target":"state:TS","type":"state_link"},{"source":"hub","target":"state:DN","type":"state_link"},{"source":"hub","target":"state:UK","type":"state_link"},{"source":"hub","target":"state:KL","type":"state_link"},{"source":"hub","target":"state:PY","type":"state_link"},{"source":"hub","target":"state:AN","type":"state_link"},{"source":"hub","target":"state:SK","type":"state_link"},{"source":"hub","target":"state:ML","type":"state_link"},{"source":"hub","target":"state:KA","type":"state_link"},{"source":"hub","target":"state:HR","type":"state_link"},{"source":"hub","target":"state:JK","type":"state_link"},{"source":"hub","target":"state:JH","type":"state_link"},{"source":"hub","target":"state:UP","type":"state_link"},{"source":"hub","target":"state:GA","type":"state_link"},{"source":"hub","target":"state:PB","type":"state_link"},{"source":"hub","target":"state:MZ","type":"state_link"},{"source":"hub","target":"state:BR","type":"state_link"},{"source":"hub","target":"state:MN","type":"state_link"},{"source":"hub","target":"state:TN","type":"state_link"},{"source":"hub","target":"state:HP","type":"state_link"},{"source":"hub","target":"state:LD","type":"state_link"},{"source":"hub","target":"state:AS","type":"state_link"},{"source":"hub","target":"state:MP","type":"state_link"},{"source":"hub","target":"state:WB","type":"state_link"},{"source":"hub","target":"state:GJ","type":"state_link"},{"source":"hub","target":"state:AR","type":"state_link"},{"source":"hub","target":"state:DL","type":"state_link"},{"source":"hub","target":"state:OD","type":"state_link"},{"source":"hub","target":"state:CG","type":"state_link"},{"source":"hub","target":"state:MH","type":"state_link"},{"source":"hub","target":"road:URB_ST","type":"road_link"},{"source":"hub","target":"road:FOREST","type":"road_link"},{"source":"hub","target":"road:URB_ART","type":"road_link"},{"source":"hub","target":"road:PROHIB","type":"road_link"},{"source":"hub","target":"road:CANT","type":"road_link"},{"source":"hub","target":"road:MDR","type":"road_link"},{"source":"hub","target":"road:PRIVATE","type":"road_link"},{"source":"hub","target":"road:SCHOOL_ZONE","type":"road_link"},{"source":"hub","target":"road:ODR","type":"road_link"},{"source":"hub","target":"road:SH","type":"road_link"},{"source":"hub","target":"road:EXP","type":"road_link"},{"source":"hub","target":"road:PORT","type":"road_link"},{"source":"hub","target":"road:TOLL_PLAZA","type":"road_link"},{"source":"hub","target":"road:NH","type":"road_link"},{"source":"hub","target":"road:BORDER","type":"road_link"},{"source":"hub","target":"road:DEF","type":"road_link"},{"source":"hub","target":"veh:2W_MC_GEAR_LT175","type":"veh_link"},{"source":"hub","target":"veh:SCHOOL_BUS","type":"veh_link"},{"source":"hub","target":"veh:TRACTOR","type":"veh_link"},{"source":"hub","target":"veh:3W_AUTO_GOODS","type":"veh_link"},{"source":"hub","target":"veh:MPV_MINIBUS","type":"veh_link"},{"source":"hub","target":"veh:3W_AUTO_PASS","type":"veh_link"},{"source":"hub","target":"veh:3W_E_RICKSHAW","type":"veh_link"},{"source":"hub","target":"veh:2W_EV_LOWSPEED","type":"veh_link"},{"source":"hub","target":"veh:LMV_CAR_EV","type":"veh_link"},{"source":"hub","target":"veh:HGV_TRUCK","type":"veh_link"},{"source":"hub","target":"veh:HGV_TRAILER","type":"veh_link"},{"source":"hub","target":"veh:FIRE_TRUCK","type":"veh_link"},{"source":"hub","target":"veh:LMV_TAXI","type":"veh_link"},{"source":"hub","target":"veh:3W_E_CART","type":"veh_link"},{"source":"hub","target":"veh:MGV","type":"veh_link"},{"source":"hub","target":"veh:2W_MC_GEAR","type":"veh_link"},{"source":"hub","target":"veh:CONSTRUCTION_EQUIP","type":"veh_link"},{"source":"hub","target":"veh:HPV_BUS","type":"veh_link"},{"source":"hub","target":"veh:2W_MOPED_50CC","type":"veh_link"},{"source":"hub","target":"veh:LMV_GOODS","type":"veh_link"},{"source":"hub","target":"veh:QUADRICYCLE","type":"veh_link"},{"source":"hub","target":"veh:AMBULANCE","type":"veh_link"},{"source":"hub","target":"veh:LMV_CAR_PVT","type":"veh_link"},{"source":"hub","target":"veh:POLICE_VEHICLE","type":"veh_link"},{"source":"hub","target":"veh:2W_SCOOTER","type":"veh_link"},{"source":"hub","target":"veh:2W_EV","type":"veh_link"},{"source":"state:MP","target":"city:IND","type":"city_link"},{"source":"state:KL","target":"city:TVM","type":"city_link"},{"source":"state:UP","target":"city:KNP","type":"city_link"},{"source":"state:MH","target":"city:NSK","type":"city_link"},{"source":"state:UK","target":"city:DDN","type":"city_link"},{"source":"state:PB","target":"city:AMD","type":"city_link"},{"source":"state:TN","target":"city:MDU","type":"city_link"},{"source":"state:KA","target":"city:BLR","type":"city_link"},{"source":"state:RJ","target":"city:JAI","type":"city_link"},{"source":"state:JH","target":"city:RAN","type":"city_link"},{"source":"state:TS","target":"city:HYD","type":"city_link"},{"source":"state:AS","target":"city:GUW","type":"city_link"},{"source":"state:OD","target":"city:BBN","type":"city_link"},{"source":"state:CH","target":"city:CHD","type":"city_link"},{"source":"state:GJ","target":"city:VAD","type":"city_link"},{"source":"state:BR","target":"city:PAT","type":"city_link"},{"source":"state:DL","target":"city:DEL","type":"city_link"},{"source":"state:AP","target":"city:VIZ","type":"city_link"},{"source":"state:WB","target":"city:KOL","type":"city_link"},{"source":"state:HR","target":"city:GNR","type":"city_link"},{"source":"state:AN","target":"city:PBR","type":"city_link"},{"source":"state:JK","target":"city:SRN","type":"city_link"},{"source":"state:LA","target":"city:LEH","type":"city_link"},{"source":"state:ML","target":"city:SHL","type":"city_link"},{"source":"state:NL","target":"city:KOH","type":"city_link"},{"source":"state:MN","target":"city:IMP","type":"city_link"},{"source":"state:TR","target":"city:AGT","type":"city_link"},{"source":"state:MZ","target":"city:AIZ","type":"city_link"},{"source":"state:AR","target":"city:ITA","type":"city_link"},{"source":"state:SK","target":"city:GTK","type":"city_link"},{"source":"state:GA","target":"city:PAN","type":"city_link"},{"source":"state:HP","target":"city:SHM","type":"city_link"},{"source":"state:PY","target":"city:PDY","type":"city_link"},{"source":"state:CG","target":"city:RPR","type":"city_link"},{"source":"state:LD","target":"city:KAV","type":"city_link"},{"source":"state:DN","target":"city:SLV","type":"city_link"},{"source":"state:DD","target":"city:DIU","type":"city_link"},{"source":"vio:HWY_LANE_INDICATOR","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:HWY_LANE_INDICATOR","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:HWY_LANE_INDICATOR","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:HWY_STOP_ON_SHOULDER","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:HWY_STOP_ON_SHOULDER","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:HWY_STOP_ON_SHOULDER","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:HWY_MIN_SPEED_VIOLATION","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:HWY_MIN_SPEED_VIOLATION","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:HWY_MIN_SPEED_VIOLATION","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:HWY_REVERSING_HIGHWAY","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:HWY_REVERSING_HIGHWAY","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:HWY_REVERSING_HIGHWAY","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:HWY_TRUCK_LEFT_LANE","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:HWY_TRUCK_LEFT_LANE","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:HWY_TRUCK_LEFT_LANE","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:FOREST","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:URB_ART","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:MDR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:ODR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:SH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_AXLE","target":"road:BORDER","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:FOREST","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:URB_ART","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:MDR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:ODR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:SH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PROJECTING_LOAD","target":"road:BORDER","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:FOREST","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:URB_ART","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:MDR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:ODR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:SH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_ROOFTOP_LUGGAGE","target":"road:BORDER","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:FOREST","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:URB_ART","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:MDR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:ODR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:SH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_WEIGHT","target":"road:BORDER","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:FOREST","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:URB_ART","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:MDR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:ODR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:SH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_PASSENGER","target":"road:BORDER","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:FOREST","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:URB_ART","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:MDR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:ODR","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:SH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:EXP","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:TOLL_PLAZA","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:NH","type":"applies_on","opacity":0.15},{"source":"vio:OVERLOAD_GOODS_CARRYING_PASSENGERS","target":"road:BORDER","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:URB_ST","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:FOREST","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:URB_ART","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:PROHIB","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:CANT","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:MDR","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:PRIVATE","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:SCHOOL_ZONE","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:ODR","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:SH","type":"applies_on","opacity":0.15},{"source":"vio:PARK_DISABLED_SPOT","target":"road:PORT","type":"applies_on","opacity":0.15}]};
+
+// ══════════════════════════════════════════════════════════
+// SCENE SETUP
+// ══════════════════════════════════════════════════════════
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x050d1a, 0.0018);
+
+const camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 3000);
+camera.position.set(0, 60, 480);
+
+// Ambient + point lights
+scene.add(new THREE.AmbientLight(0x1a2a4a, 1.5));
+const pl1 = new THREE.PointLight(0x3b82f6, 2.5, 600);
+pl1.position.set(0, 200, 0);
+scene.add(pl1);
+const pl2 = new THREE.PointLight(0x7c3aed, 1.5, 500);
+pl2.position.set(-200, -100, 100);
+scene.add(pl2);
+const pl3 = new THREE.PointLight(0x10b981, 1.0, 400);
+pl3.position.set(200, -80, -100);
+scene.add(pl3);
+
+// Stars background
+(function addStars(){
+  const geo = new THREE.BufferGeometry();
+  const cnt = 1800;
+  const pos = new Float32Array(cnt*3);
+  for(let i=0;i<cnt*3;i++) pos[i]=(Math.random()-0.5)*2400;
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({color:0x334155,size:0.8,transparent:true,opacity:0.7});
+  scene.add(new THREE.Points(geo,mat));
+})();
+
+// ══════════════════════════════════════════════════════════
+// NODE POSITIONING
+// ══════════════════════════════════════════════════════════
+const nodeMap = {};
+const positions = {};
+
+// Layout radii
+const R_HUB     = 0;
+const R_VGROUP  = 90;    // violation groups inner ring
+const R_VIO     = 175;   // violations mid sphere
+const R_STATE   = 270;   // states outer sphere
+const R_CITY    = 330;   // cities outermost
+const R_ROAD    = 120;   // road types side cluster
+const R_VEH     = 120;   // vehicles side cluster
+
+function spherePoint(index, total, radius, tiltX=0, tiltY=0, tiltZ=0) {
+  // Fibonacci sphere distribution
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const y = 1 - (index / (total-1||1)) * 2;
+  const r = Math.sqrt(Math.max(0, 1-y*y));
+  const theta = golden * index;
+  return new THREE.Vector3(
+    Math.cos(theta)*r*radius,
+    y*radius,
+    Math.sin(theta)*r*radius
+  );
+}
+
+function ringPoint(index, total, radius, yOffset=0, yScale=0.4) {
+  const angle = (index/total)*Math.PI*2;
+  const wobble = (Math.random()-0.5)*radius*yScale;
+  return new THREE.Vector3(
+    Math.cos(angle)*radius,
+    yOffset + wobble,
+    Math.sin(angle)*radius
+  );
+}
+
+// Build node lookup
+GRAPH_DATA.nodes.forEach(n => nodeMap[n.id] = n);
+
+// Assign positions
+const vioGroups = GRAPH_DATA.nodes.filter(n=>n.type==='vio_group');
+const viols     = GRAPH_DATA.nodes.filter(n=>n.type==='violation');
+const states    = GRAPH_DATA.nodes.filter(n=>n.type==='state');
+const cities    = GRAPH_DATA.nodes.filter(n=>n.type==='city');
+const roads     = GRAPH_DATA.nodes.filter(n=>n.type==='road');
+const vehs      = GRAPH_DATA.nodes.filter(n=>n.type==='vehicle');
+
+// Hub
+positions['hub'] = new THREE.Vector3(0,0,0);
+
+// Violation groups — inner sphere, evenly spaced
+vioGroups.forEach((n,i) => {
+  positions[n.id] = spherePoint(i, vioGroups.length, R_VGROUP);
+});
+
+// Violations — mid sphere, but pulled toward their group
+viols.forEach((n,i) => {
+  const groupId = 'grp:' + n.group;
+  const gp = positions[groupId];
+  const sp = spherePoint(i, viols.length, R_VIO);
+  // blend toward group direction
+  if(gp) {
+    const dir = gp.clone().normalize();
+    const rnd = (Math.random()-0.5)*40;
+    positions[n.id] = dir.clone().multiplyScalar(R_VIO + rnd).add(
+      new THREE.Vector3((Math.random()-0.5)*30,(Math.random()-0.5)*30,(Math.random()-0.5)*30)
+    );
+  } else {
+    positions[n.id] = sp;
+  }
+});
+
+// States — outer sphere
+states.forEach((n,i) => {
+  positions[n.id] = spherePoint(i, states.length, R_STATE);
+});
+
+// Cities — near their state
+cities.forEach((n,i) => {
+  const stateId = 'state:' + n.state;
+  const sp = positions[stateId];
+  if(sp) {
+    const offset = new THREE.Vector3(
+      (Math.random()-0.5)*45,
+      (Math.random()-0.5)*45,
+      (Math.random()-0.5)*45
+    );
+    positions[n.id] = sp.clone().normalize().multiplyScalar(R_CITY).add(offset);
+  } else {
+    positions[n.id] = spherePoint(i, cities.length, R_CITY);
+  }
+});
+
+// Roads — left cluster
+roads.forEach((n,i) => {
+  const angle = (i/roads.length)*Math.PI*2;
+  positions[n.id] = new THREE.Vector3(
+    -R_ROAD*1.6 + Math.cos(angle)*40,
+    Math.sin(angle)*40,
+    (Math.random()-0.5)*50
+  );
+});
+
+// Vehicles — right cluster
+vehs.forEach((n,i) => {
+  const angle = (i/vehs.length)*Math.PI*2;
+  positions[n.id] = new THREE.Vector3(
+    R_VEH*1.6 + Math.cos(angle)*45,
+    Math.sin(angle)*45,
+    (Math.random()-0.5)*50
+  );
+});
+
+// ══════════════════════════════════════════════════════════
+// MATERIALS & GEOMETRIES
+// ══════════════════════════════════════════════════════════
+const TYPE_COLOR = {
+  hub:'#ffffff', vio_group:'#f97316', violation:'#ef4444',
+  state:'#3b82f6', city:'#a78bfa', road:'#fbbf24', vehicle:'#34d399'
+};
+
+function hexToColor(hex) {
+  return new THREE.Color(hex);
+}
+
+const geos = {
+  hub:      new THREE.SphereGeometry(12, 32, 32),
+  vio_group:new THREE.IcosahedronGeometry(8, 1),
+  violation:new THREE.SphereGeometry(1, 16, 16),  // sized per node
+  state:    new THREE.OctahedronGeometry(5, 0),
+  city:     new THREE.SphereGeometry(3, 8, 8),
+  road:     new THREE.BoxGeometry(7,7,7),
+  vehicle:  new THREE.ConeGeometry(4, 9, 6),
+};
+
+// ══════════════════════════════════════════════════════════
+// BUILD MESHES
+// ══════════════════════════════════════════════════════════
+const meshes = {};
+const nodeGroup = new THREE.Group();
+scene.add(nodeGroup);
+
+function glowMaterial(color, emissiveStrength=0.6, opacity=1) {
+  return new THREE.MeshPhongMaterial({
+    color: color,
+    emissive: color,
+    emissiveIntensity: emissiveStrength,
+    transparent: opacity < 1,
+    opacity: opacity,
+    shininess: 80,
+  });
+}
+
+GRAPH_DATA.nodes.forEach(n => {
+  const pos = positions[n.id];
+  if(!pos) return;
+
+  const color = hexToColor(n.color || TYPE_COLOR[n.type] || '#94a3b8');
+  let geo, mat;
+
+  if(n.type === 'hub') {
+    geo = geos.hub;
+    mat = new THREE.MeshPhongMaterial({
+      color: 0xffffff, emissive: 0x3b82f6, emissiveIntensity: 0.8,
+      transparent:true, opacity:0.9, shininess:120,
+    });
+  } else if(n.type === 'violation') {
+    const r = Math.max(3, Math.min(8, n.size||5));
+    geo = new THREE.SphereGeometry(r, 14, 14);
+    mat = glowMaterial(color, 0.5);
+  } else if(n.type === 'vio_group') {
+    geo = geos.vio_group;
+    mat = new THREE.MeshPhongMaterial({
+      color, emissive:color, emissiveIntensity:0.7,
+      wireframe:false, transparent:true, opacity:0.85, shininess:60,
+    });
+  } else if(n.type === 'state') {
+    geo = geos.state;
+    mat = glowMaterial(color, 0.5, 0.9);
+  } else if(n.type === 'city') {
+    geo = geos.city;
+    mat = glowMaterial(color, 0.4, 0.85);
+  } else if(n.type === 'road') {
+    geo = geos.road;
+    mat = glowMaterial(color, 0.5);
+  } else if(n.type === 'vehicle') {
+    geo = geos.vehicle;
+    mat = glowMaterial(color, 0.5);
+  } else {
+    geo = new THREE.SphereGeometry(4,10,10);
+    mat = glowMaterial(color, 0.4);
+  }
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(pos);
+  mesh.userData = { nodeId: n.id, nodeData: n };
+  nodeGroup.add(mesh);
+  meshes[n.id] = mesh;
+});
+
+// Hub glow halo
+const haloGeo = new THREE.SphereGeometry(20, 32, 32);
+const haloMat = new THREE.MeshPhongMaterial({
+  color:0x3b82f6, emissive:0x3b82f6, emissiveIntensity:0.3,
+  transparent:true, opacity:0.08, side:THREE.BackSide,
+});
+const halo = new THREE.Mesh(haloGeo, haloMat);
+nodeGroup.add(halo);
+
+// ══════════════════════════════════════════════════════════
+// EDGES
+// ══════════════════════════════════════════════════════════
+const edgeGroup = new THREE.Group();
+scene.add(edgeGroup);
+let edgesVisible = true;
+
+const EDGE_COLORS = {
+  group_link: 0xf97316,
+  vio_link:   0xef4444,
+  state_link: 0x3b82f6,
+  city_link:  0x7c3aed,
+  road_link:  0xfbbf24,
+  veh_link:   0x34d399,
+  applies_on: 0x1e3a5f,
+};
+const EDGE_OPAC = {
+  group_link:0.5, vio_link:0.2, state_link:0.4,
+  city_link:0.15, road_link:0.4, veh_link:0.35, applies_on:0.06,
+};
+
+GRAPH_DATA.links.forEach(link => {
+  const sp = positions[link.source];
+  const ep = positions[link.target];
+  if(!sp || !ep) return;
+
+  const points = [sp.clone(), ep.clone()];
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({
+    color: EDGE_COLORS[link.type] || 0x334155,
+    transparent: true,
+    opacity: EDGE_OPAC[link.type] || 0.15,
+  });
+  const line = new THREE.Line(geo, mat);
+  edgeGroup.add(line);
+});
+
+// ══════════════════════════════════════════════════════════
+// LABELS (canvas sprites)
+// ══════════════════════════════════════════════════════════
+const labelGroup = new THREE.Group();
+scene.add(labelGroup);
+let labelsVisible = true;
+
+function makeLabel(text, color='#e2e8f0', fontSize=13) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.font = `${fontSize}px Inter,sans-serif`;
+  const w = ctx.measureText(text).width + 16;
+  canvas.width = Math.ceil(w * 2);
+  canvas.height = Math.ceil((fontSize + 8) * 2);
+  ctx.scale(2,2);
+  ctx.font = `${fontSize}px Inter,sans-serif`;
+  ctx.fillStyle = color;
+  ctx.fillText(text, 8, fontSize);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.9,depthTest:false});
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(canvas.width/14, canvas.height/14, 1);
+  return sprite;
+}
+
+// Labels for important nodes only (hub, groups, states, roads, vehicles)
+GRAPH_DATA.nodes.forEach(n => {
+  if(!['hub','vio_group','state','road','vehicle'].includes(n.type)) return;
+  const pos = positions[n.id];
+  if(!pos) return;
+
+  const offset = {hub:18,vio_group:13,state:10,road:12,vehicle:12}[n.type]||8;
+  const fontSize = {hub:15,vio_group:11,state:10,road:10,vehicle:10}[n.type]||9;
+  const color = {hub:'#ffffff',vio_group:'#fed7aa',state:'#93c5fd',road:'#fde68a',vehicle:'#6ee7b7'}[n.type]||'#cbd5e1';
+
+  const label = makeLabel(n.label, color, fontSize);
+  label.position.copy(pos);
+  label.position.y += offset;
+  label.userData = {nodeId:n.id};
+  labelGroup.add(label);
+});
+
+// ══════════════════════════════════════════════════════════
+// MOUSE INTERACTION
+// ══════════════════════════════════════════════════════════
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredMesh = null;
+let selectedMesh = null;
+const tooltip = document.getElementById('tooltip');
+const ttType = document.getElementById('tt-type');
+const ttLabel = document.getElementById('tt-label');
+
+document.addEventListener('mousemove', e => {
+  mouse.x = (e.clientX/W)*2-1;
+  mouse.y = -(e.clientY/H)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeGroup.children);
+
+  if(hits.length) {
+    const mesh = hits[0].object;
+    if(mesh !== hoveredMesh) {
+      if(hoveredMesh && hoveredMesh !== selectedMesh) {
+        hoveredMesh.material.emissiveIntensity = hoveredMesh._origEI || 0.5;
+        hoveredMesh.scale.setScalar(1);
+      }
+      hoveredMesh = mesh;
+      if(mesh !== selectedMesh) {
+        mesh._origEI = mesh.material.emissiveIntensity;
+        mesh.material.emissiveIntensity = 1.5;
+        mesh.scale.setScalar(1.3);
+      }
+    }
+    const nd = mesh.userData.nodeData;
+    if(nd) {
+      ttType.textContent = nd.type?.replace('_',' ').toUpperCase() || '';
+      ttLabel.textContent = nd.label || nd.id;
+      tooltip.style.display='block';
+      tooltip.style.left = (e.clientX+16)+'px';
+      tooltip.style.top  = (e.clientY-10)+'px';
+    }
+    document.body.style.cursor='pointer';
+  } else {
+    if(hoveredMesh && hoveredMesh !== selectedMesh) {
+      hoveredMesh.material.emissiveIntensity = hoveredMesh._origEI || 0.5;
+      hoveredMesh.scale.setScalar(1);
+    }
+    hoveredMesh = null;
+    tooltip.style.display='none';
+    document.body.style.cursor='default';
+  }
+});
+
+document.addEventListener('click', e => {
+  if(e.target !== renderer.domElement) return;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeGroup.children);
+  if(hits.length) {
+    const mesh = hits[0].object;
+    const nd = mesh.userData.nodeData;
+    if(!nd || nd.id==='hub') return;
+    if(selectedMesh) {
+      selectedMesh.scale.setScalar(1);
+      selectedMesh.material.emissiveIntensity = selectedMesh._origEI || 0.5;
+    }
+    selectedMesh = mesh;
+    mesh.scale.setScalar(1.6);
+    mesh.material.emissiveIntensity = 2.0;
+    showInfoPanel(nd);
+  }
+});
+
+function showInfoPanel(n) {
+  const panel = document.getElementById('info-panel');
+  const badge = document.getElementById('info-type');
+  const nameEl = document.getElementById('info-name');
+  const fieldsEl = document.getElementById('info-fields');
+  const descEl = document.getElementById('info-desc');
+
+  const typeColors = {
+    violation:'#ef4444',vio_group:'#f97316',state:'#3b82f6',
+    city:'#a78bfa',road:'#fbbf24',vehicle:'#34d399'
+  };
+  const tc = typeColors[n.type]||'#64748b';
+  badge.textContent = n.type?.replace('_',' ').toUpperCase()||'NODE';
+  badge.style.background = tc+'22';
+  badge.style.color = tc;
+  badge.style.border = `1px solid ${tc}44`;
+  nameEl.textContent = n.label || n.id;
+
+  const fields = [];
+  if(n.mv_section)   fields.push(['MV Section', '§'+n.mv_section]);
+  if(n.fine_count)   fields.push(['Fine Records', n.fine_count]);
+  if(n.compoundable!==undefined) fields.push(['Compoundable', n.compoundable?'Yes':'No — court required']);
+  if(n.count)        fields.push(['Violations', n.count]);
+  if(n.rto)          fields.push(['RTO Prefix', n.rto]);
+  if(n.capital)      fields.push(['Capital', n.capital]);
+  if(n.multiplier&&n.multiplier!==1) fields.push(['Fine Multiplier', n.multiplier+'×']);
+  if(n.segment)      fields.push(['Segment', n.segment?.replace('_',' ')]);
+  if(n.fine_class)   fields.push(['Fine Class', n.fine_class]);
+  if(n.bucket)       fields.push(['Road Bucket', n.bucket]);
+  if(n.state)        fields.push(['State', n.state]);
+
+  fieldsEl.innerHTML = fields.map(([k,v])=>
+    `<div class="field"><span class="key">${k}</span><span class="val">${v}</span></div>`
+  ).join('');
+
+  descEl.textContent = n.description || '';
+  descEl.style.display = n.description ? 'block':'none';
+
+  panel.classList.add('visible');
+}
+
+document.getElementById('close-info').addEventListener('click', () => {
+  document.getElementById('info-panel').classList.remove('visible');
+  if(selectedMesh) {
+    selectedMesh.scale.setScalar(1);
+    selectedMesh.material.emissiveIntensity = selectedMesh._origEI || 0.5;
+    selectedMesh = null;
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// SEARCH
+// ══════════════════════════════════════════════════════════
+const searchInput = document.getElementById('search-input');
+let searchHighlighted = [];
+
+searchInput.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase().trim();
+  searchHighlighted.forEach(id => {
+    const m = meshes[id];
+    if(m && m !== selectedMesh) {
+      m.scale.setScalar(1);
+      m.material.emissiveIntensity = m._origEI || 0.5;
+    }
+  });
+  searchHighlighted = [];
+  if(!q) return;
+  GRAPH_DATA.nodes.forEach(n => {
+    if((n.label||'').toLowerCase().includes(q) || (n.id||'').toLowerCase().includes(q)) {
+      const m = meshes[n.id];
+      if(m) {
+        m._origEI = m.material.emissiveIntensity;
+        m.scale.setScalar(2.0);
+        m.material.emissiveIntensity = 2.5;
+        searchHighlighted.push(n.id);
+      }
+    }
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// ORBIT CONTROLS (manual implementation)
+// ══════════════════════════════════════════════════════════
+let autoRotate = true;
+let isDragging = false;
+let prevMouse = {x:0,y:0};
+let spherical = {theta:0, phi:Math.PI/2.5, radius:480};
+const MIN_R=150, MAX_R=900;
+
+renderer.domElement.addEventListener('mousedown', e => {
+  isDragging=true; prevMouse={x:e.clientX,y:e.clientY};
+});
+renderer.domElement.addEventListener('mouseup', ()=>isDragging=false);
+renderer.domElement.addEventListener('mouseleave', ()=>isDragging=false);
+
+renderer.domElement.addEventListener('mousemove', e => {
+  if(!isDragging) return;
+  const dx=e.clientX-prevMouse.x, dy=e.clientY-prevMouse.y;
+  spherical.theta -= dx*0.005;
+  spherical.phi   = Math.max(0.2, Math.min(Math.PI-0.2, spherical.phi + dy*0.005));
+  prevMouse={x:e.clientX,y:e.clientY};
+});
+
+renderer.domElement.addEventListener('wheel', e => {
+  spherical.radius = Math.max(MIN_R, Math.min(MAX_R, spherical.radius+e.deltaY*0.5));
+},{passive:true});
+
+// Touch support
+renderer.domElement.addEventListener('touchstart', e => {
+  isDragging=true;
+  prevMouse={x:e.touches[0].clientX,y:e.touches[0].clientY};
+},{passive:true});
+renderer.domElement.addEventListener('touchend', ()=>isDragging=false);
+renderer.domElement.addEventListener('touchmove', e => {
+  if(!isDragging) return;
+  const dx=e.touches[0].clientX-prevMouse.x, dy=e.touches[0].clientY-prevMouse.y;
+  spherical.theta -= dx*0.005;
+  spherical.phi   = Math.max(0.2,Math.min(Math.PI-0.2,spherical.phi+dy*0.005));
+  prevMouse={x:e.touches[0].clientX,y:e.touches[0].clientY};
+},{passive:true});
+
+// Buttons
+document.getElementById('btn-rotate').addEventListener('click', function(){
+  autoRotate=!autoRotate;
+  this.classList.toggle('active',autoRotate);
+});
+document.getElementById('btn-labels').addEventListener('click', function(){
+  labelsVisible=!labelsVisible;
+  labelGroup.visible=labelsVisible;
+  this.classList.toggle('active',labelsVisible);
+});
+document.getElementById('btn-links').addEventListener('click', function(){
+  edgesVisible=!edgesVisible;
+  edgeGroup.visible=edgesVisible;
+  this.classList.toggle('active',edgesVisible);
+});
+document.getElementById('btn-reset').addEventListener('click', ()=>{
+  spherical={theta:0,phi:Math.PI/2.5,radius:480};
+});
+
+// ══════════════════════════════════════════════════════════
+// ANIMATE
+// ══════════════════════════════════════════════════════════
+let t=0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.005;
+
+  // Auto-rotate
+  if(autoRotate && !isDragging) spherical.theta += 0.0015;
+
+  // Camera orbit
+  camera.position.x = spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  camera.position.y = spherical.radius * Math.cos(spherical.phi);
+  camera.position.z = spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.lookAt(0,0,0);
+
+  // Hub pulse
+  const hub = meshes['hub'];
+  if(hub) {
+    const s = 1 + Math.sin(t*2)*0.08;
+    hub.scale.setScalar(s);
+    hub.material.emissiveIntensity = 0.6 + Math.sin(t*2)*0.3;
+    halo.scale.setScalar(s*1.4);
+    halo.material.opacity = 0.05 + Math.sin(t)*0.04;
+  }
+
+  // Violation group gentle pulse
+  vioGroups.forEach((n,i) => {
+    const m = meshes[n.id];
+    if(m && m!==selectedMesh && m!==hoveredMesh) {
+      m.rotation.y = t*0.4 + i;
+      m.rotation.x = t*0.2 + i*0.5;
+    }
+  });
+
+  // Point light orbit
+  pl1.position.x = Math.sin(t*0.4)*250;
+  pl1.position.z = Math.cos(t*0.4)*250;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// Resize
+window.addEventListener('resize', ()=>{
+  const w=window.innerWidth, h=window.innerHeight;
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+});
+</script>
+</body>
+</html>

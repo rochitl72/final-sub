@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "DriveLegal",
+    "slug": "drivelegal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050d1f"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.drivelegal.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "DriveLegal uses your location to find nearby cities and look up applicable traffic fines."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#050d1f"
+      },
+      "package": "com.drivelegal.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow DriveLegal to use your location."
+        }
+      ],
+      "expo-asset",
+      "expo-web-browser",
+      "expo-font"
+    ],
+    "scheme": "drivelegal",
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DriveLegal — Docs</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --accent: #38bdf8; --accent2: #a78bfa; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: radial-gradient(ellipse at top, #1e3a5f 0%, var(--bg) 55%);
+      color: var(--text); display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      max-width: 520px; width: 100%; background: var(--card); border: 1px solid #334155;
+      border-radius: 16px; padding: 32px; box-shadow: 0 24px 48px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 8px; font-size: 1.75rem; }
+    p { color: var(--muted); line-height: 1.6; margin: 0 0 24px; }
+    a.btn {
+      display: block; text-align: center; text-decoration: none; font-weight: 600;
+      padding: 14px 20px; border-radius: 10px; margin-bottom: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #0f172a;
+    }
+    a.link { color: var(--accent); font-size: 0.9rem; }
+    .links { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>DriveLegal</h1>
+    <p>Indian road-law assistant — documentation and interactive knowledge graph hosted on GitHub Pages.</p>
+    <a class="btn" href="visualizations/drivelegal_graph_3d.html">Open 3D knowledge graph</a>
+    <div class="links">
+      <a class="link" href="https://github.com/rochitl72/final-sub">Repository on GitHub</a>
+      <a class="link" href="https://github.com/rochitl72/final-sub/blob/main/README.md">README</a>
+      <a class="link" href="https://github.com/rochitl72/final-sub/blob/main/SETUP.md">Setup guide</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+!config/.env.example
+
+# Mobile local API URL (written by start.sh)
+apps/mobile/.env
+
+# Runtime / local data
+backend/data/*.db
+backend/data/*.db-shm
+backend/data/*.db-wal
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
