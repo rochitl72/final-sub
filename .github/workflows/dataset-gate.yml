@@ -52,6 +52,14 @@ jobs:
         # (violation x state) cell, or offline could state a different law.
         run: python3 tools/dataset/bench_parity.py
 
+      - name: Cross-language parity (python backend vs typescript offline client)
+        # Two separate ports of the same cascade. Nothing else in the build would
+        # notice if they drifted, and a citizen offline in a tunnel would then be
+        # told a different law from one online at the same spot.
+        run: |
+          cd apps/mobile && npm ci --silent && cd ../..
+          python3 tools/dataset/cross_parity.py
+
       - name: Offline bundle is current and gated
         run: |
           python3 scripts/build_offline_bundle.py

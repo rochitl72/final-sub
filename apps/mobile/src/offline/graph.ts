@@ -26,6 +26,11 @@ export interface Violation {
   common_misconception: string | null;
 }
 
+export interface Citation {
+  source_url: string | null;
+  retrieved_at: string | null;
+}
+
 export interface FineNode {
   first_offence: number | null;
   repeat_offence: number | null;
@@ -34,6 +39,8 @@ export interface FineNode {
   state_code: string | null;
   city_code: string | null;
   note: string | null;
+  /** Present on every fine in the bundle: unsourced rows are not shipped. */
+  citation?: Citation;
 }
 
 export interface FineCard {
@@ -51,11 +58,16 @@ export interface FineCard {
   state_code: string | null;
   city_code: string | null;
   violation_group: string | null;
+  /** Provenance. If `citation.source_url` is absent the UI must not render the
+   *  amount as law. Mirrors backend/graph_engine.quick_fine. */
+  citation: Citation | null;
+  fallback_note: string | null;
+  answered_at_level: string;
 }
 
 type Bundle = {
   violations: Record<string, Violation>;
-  states: Record<string, { name: string; multiplier: number; fallback_central: boolean }>;
+  states: Record<string, { name: string; fallback_central: boolean }>;
   fines: Record<string, FineNode>;
   fine_by_violation: Record<string, {
     central: string[];
@@ -125,19 +137,22 @@ export function getFine(
   const fbi = B.fine_by_violation[violationCode];
   if (!fbi) return null;
 
+  // `fine_by_violation` indexes the FULL graph, but the bundle ships only rows
+  // whose amount is sourced. A missing row therefore means "withheld", and we
+  // must keep descending the cascade rather than returning null — otherwise an
+  // unsourced state row would mask the statutory figure that does apply.
+  // (The final fallback also has to scan for ANY present row: returning
+  // nids[0] blindly missed vehicle-scoped rows when no vehicle was supplied.)
   const pick = (nids: string[] | undefined, vc?: string | null): FineNode | null => {
     if (!nids || nids.length === 0) return null;
+    const present = nids.map((id) => B.fines[id]).filter((n): n is FineNode => !!n);
+    if (present.length === 0) return null;
     if (vc) {
-      for (const nid of nids) {
-        const n = B.fines[nid];
-        if (n && n.vehicle_class === vc) return n;
-      }
+      const exact = present.find((n) => n.vehicle_class === vc);
+      if (exact) return exact;
     }
-    for (const nid of nids) {
-      const n = B.fines[nid];
-      if (n && !n.vehicle_class) return n;
-    }
-    return B.fines[nids[0]] ?? null;
+    const generic = present.find((n) => !n.vehicle_class);
+    return generic ?? present[0];
   };
 
   if (cityCode) {
@@ -175,8 +190,18 @@ export function quickFine(
     fine_repeat: fine.repeat_offence,
     imprisonment: fine.imprisonment,
     fine_source: fine.fine_source || 'central',
-    state_code: fine.state_code,
-    city_code: fine.city_code,
+    // Echo the jurisdiction the user ASKED about; `answered_at_level` says which
+    // level actually supplied the figure. Echoing the matched row silently
+    // blanked the state whenever the answer fell through to central.
+    state_code: stateCode ?? fine.state_code,
+    city_code: cityCode ?? fine.city_code,
+    answered_at_level: fine.fine_source || 'central',
     violation_group: vio ? vio.grp : null,
+    citation: fine.citation ?? null,
+    fallback_note:
+      (fine.fine_source || 'central') === 'central' && stateCode
+        ? `${getState(stateCode)?.name ?? stateCode} has no verified notification of a ` +
+          'different amount, so the figure fixed by the Motor Vehicles Act applies.'
+        : null,
   };
 }
