@@ -36,11 +36,18 @@ import math
 import re
 import threading
 from functools import lru_cache
+
+from provenance import fine_amount, citation_for, fallback_note, is_sourced
 from pathlib import Path
 from typing import Optional
 
 _HERE       = Path(__file__).parent
-_GRAPH_PATH = _HERE.parent / "data" / "compiled" / "drivelegal_graph.json"
+_SERVING_PATH = _HERE.parent / "data" / "compiled" / "drivelegal_graph.v5.serving.json"
+_LEGACY_PATH = _HERE.parent / "data" / "compiled" / "drivelegal_graph.json"
+# The v5 serving graph withholds every field that failed source verification.
+# Falling back to the legacy v3 graph restores unsourced values, so it is only
+# for local experiments — never for anything a member of the public can reach.
+_GRAPH_PATH = _SERVING_PATH if _SERVING_PATH.exists() else _LEGACY_PATH
 
 _engine_instance = None
 _lock = threading.Lock()
@@ -427,18 +434,29 @@ class GraphEngine:
             return None
 
         def _pick(nids, vc=None):
+            """Choose a fine row, skipping any whose amount is not sourced.
+
+            Skipping rather than returning is what makes the cascade honest: an
+            unsourced state row falls through to the central figure, which IS
+            the operative law where a state has notified nothing (s.200). If no
+            level has a sourced amount, the caller gets None and must refuse.
+            """
             if not nids:
                 return None
             if vc:
                 for nid in nids:
                     n = self.nodes.get(nid, {})
-                    if n.get("vehicle_class") == vc:
+                    if n.get("vehicle_class") == vc and fine_amount(n) is not None:
                         return n
             for nid in nids:
                 n = self.nodes.get(nid, {})
-                if not n.get("vehicle_class"):
+                if not n.get("vehicle_class") and fine_amount(n) is not None:
                     return n
-            return self.nodes.get(nids[0])
+            for nid in nids:
+                n = self.nodes.get(nid, {})
+                if fine_amount(n) is not None:
+                    return n
+            return None
 
         if city_code:
             r = _pick(fbi.get("city",{}).get(city_code,[]), vehicle_class)
@@ -519,8 +537,16 @@ class GraphEngine:
         if state_code:
             st = self.get_state(state_code)
             if st:
-                mult = f"{st['multiplier']}x" if st.get("multiplier") != 1.0 else "standard"
-                parts.append(f"STATE: {st['name']} ({st['code']}) — fine multiplier: {mult}")
+                # The old graph carried a per-state `multiplier` used to scale central
+                # fines. It has no basis in law — s.200 lets a State Government
+                # notify amounts, not scale them — and it did not even reproduce the
+                # stored state fines. It was removed in v5; do not reintroduce it.
+                parts.append(
+                    f"STATE: {st['name']} ({st['code']}). State compounding amounts are "
+                    f"fixed by state notification under s.200 MV Act. Where no verified "
+                    f"state amount exists, the Motor Vehicles Act figure applies and the "
+                    f"answer must say so."
+                )
 
         # City (with enforcement summary)
         if city_code:
@@ -635,7 +661,8 @@ class GraphEngine:
         card = {
             "violation_code":       violation_code,
             "violation_name":       vio["name"]                  if vio else violation_code,
-            "mv_section":           vio.get("mv_section")        if vio else None,
+            "mv_section":           (vio.get("mv_section")
+                                     if vio and is_sourced(vio, "mv_section") else None),
             "compoundable":         vio.get("compoundable")      if vio else False,
             "what_to_do_next":      vio.get("what_to_do_next")   if vio else None,
             "tips_to_avoid":        vio.get("tips_to_avoid")     if vio else None,
@@ -646,9 +673,19 @@ class GraphEngine:
             "fine_repeat":          fine.get("repeat_offence"),
             "imprisonment":         fine.get("imprisonment"),
             "fine_source":          fine.get("fine_source", "central"),
-            "state_code":           fine.get("state_code"),
-            "city_code":            fine.get("city_code"),
+            "state_code":           state_code or fine.get("state_code"),
+            "city_code":            city_code  or fine.get("city_code"),
+            "answered_at_level":    fine.get("fine_source", "central"),
             "violation_group":      vio.get("grp")               if vio else None,
+            # ── Provenance. Every figure shown to the public carries its source.
+            # `citation` is not decoration: if it is absent the UI must not
+            # render the amount as law. See backend/provenance.py.
+            "citation":             citation_for(fine, vio),
+            "fallback_note":        fallback_note(
+                                        fine.get("fine_source", "central"),
+                                        (self.get_state(state_code) or {}).get("name")
+                                        if state_code else None),
+            "section_verified":     bool(vio and is_sourced(vio, "mv_section")),
             # Patch fields — populated below if updates exist, None otherwise
             "patch_fine_first":     None,
             "patch_fine_repeat":    None,

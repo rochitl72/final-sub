@@ -1,0 +1,75 @@
+name: dataset gate
+
+# The DriveLegal dataset serves legal information to the public. Every figure it
+# states must be traceable to an instrument. These checks exist because each of
+# the failures they catch has already happened once:
+#   * unsourced amounts were served as law (12.6% of claims contradicted the statute)
+#   * a derived field silently re-opened the provenance gate after it was closed
+#   * the offline bundle drifted from the online graph with nothing to detect it
+#
+# See docs/DATASET_VALIDATION_REPORT.md.
+
+on:
+  push:
+    paths:
+      - 'data/**'
+      - 'backend/graph_engine.py'
+      - 'backend/provenance.py'
+      - 'scripts/build_offline_bundle.py'
+      - 'tools/dataset/**'
+      - '.github/workflows/dataset-gate.yml'
+  pull_request:
+    paths:
+      - 'data/**'
+      - 'backend/**'
+      - 'scripts/build_offline_bundle.py'
+      - 'tools/dataset/**'
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Provenance gate
+        # Fails on: money without a source, a citation that did not verify, a
+        # derived field surviving its source field's withholding, untyped money,
+        # an unsafe cascade flag, a dangling jurisdiction, a stale SQLite build.
+        run: python3 tools/dataset/ci_gate.py
+
+      - name: Answer regression
+        # Every answer must remain traceable, and no value may change except to
+        # replace one that had no source.
+        run: python3 tools/dataset/regression_check.py
+
+      - name: Online / offline parity
+        # The SQLite artifact and the JSON resolver must agree on every
+        # (violation x state) cell, or offline could state a different law.
+        run: python3 tools/dataset/bench_parity.py
+
+      - name: Offline bundle is current and gated
+        run: |
+          python3 scripts/build_offline_bundle.py
+          git diff --exit-code apps/mobile/src/offline/drivelegal_offline.json \
+            || { echo "::error::offline bundle is stale — run scripts/build_offline_bundle.py and commit"; exit 1; }
+          python3 - <<'PY'
+          import json, sqlite3, pathlib
+          b = json.loads(pathlib.Path('apps/mobile/src/offline/drivelegal_offline.json').read_text())
+          n_json = len(b['fines'])
+          con = sqlite3.connect('file:data/compiled/drivelegal.sqlite?immutable=1', uri=True)
+          n_db = con.execute('SELECT COUNT(*) FROM fine').fetchone()[0]
+          assert n_json == n_db, f'offline bundle has {n_json} fines, SQLite has {n_db}'
+          missing = [k for k, v in b['fines'].items() if not (v.get('citation') or {}).get('source_url')]
+          assert not missing, f'{len(missing)} offline fines have no source_url: {missing[:5]}'
+          print(f'offline bundle OK: {n_json} fines, all sourced, matches SQLite')
+          PY
+
+      - name: Backend tests
+        run: |
+          pip install -q pytest fastapi 'httpx<0.28' python-jose
+          cd backend && python3 -m pytest tests -q

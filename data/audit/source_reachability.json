@@ -1,0 +1,398 @@
+[
+ {
+  "key": "parivahan_fines",
+  "url": "https://parivahan.gov.in/parivahan//en/content/traffic-fines-challan",
+  "http": "404",
+  "bytes": 244566,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "http 404"
+ },
+ {
+  "key": "morth_road_transport",
+  "url": "https://morth.nic.in/road-transport",
+  "http": "200",
+  "bytes": 41008,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "egazette_search",
+  "url": "https://egazette.nic.in/SearchEgazette.aspx?orgname=Motor+Vehicles",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "echallan_parivahan",
+  "url": "https://echallan.parivahan.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "DL_delhi_traffic",
+  "url": "https://delhitrafficpolice.nic.in/traffic-fines/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "MH_traffic",
+  "url": "https://mahatrafficpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "KA_police",
+  "url": "https://ksp.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "TN_police",
+  "url": "https://tnpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (60) SSL: no alternative certificate subject name matches target host name 'tnpolice.gov.in'\nMore details here: ht"
+ },
+ {
+  "key": "TS_police",
+  "url": "https://tspolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "AP_traffic",
+  "url": "https://aptrafficpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "UP_police",
+  "url": "https://uppolice.gov.in",
+  "http": "200",
+  "bytes": 237149,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "GJ_police",
+  "url": "https://www.gujaratpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "RJ_police",
+  "url": "https://police.rajasthan.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "KL_police",
+  "url": "https://keralapolice.gov.in",
+  "http": "200",
+  "bytes": 402317,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "WB_police",
+  "url": "https://wbpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "PB_police",
+  "url": "https://punjabpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "HR_police",
+  "url": "https://haryanapolice.gov.in",
+  "http": "200",
+  "bytes": 61187,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "BR_police",
+  "url": "https://biharpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "MP_police",
+  "url": "https://mppolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "OD_police",
+  "url": "https://odishapolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "AS_police",
+  "url": "https://assampolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "JH_police",
+  "url": "https://jhpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to jhpolice.gov.in:443"
+ },
+ {
+  "key": "CG_police",
+  "url": "https://cgpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "HP_police",
+  "url": "https://hppolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (60) SSL: no alternative certificate subject name matches target host name 'hppolice.gov.in'\nMore details here: ht"
+ },
+ {
+  "key": "UK_police",
+  "url": "https://uttarakhandpolice.uk.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "GA_police",
+  "url": "https://goapolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "JK_police",
+  "url": "https://jkpolice.gov.in",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "MN_police",
+  "url": "https://manipurpolice.gov.in",
+  "http": "200",
+  "bytes": 58641,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "MH_transport",
+  "url": "https://transport.maharashtra.gov.in/",
+  "http": "200",
+  "bytes": 172086,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "KA_transport",
+  "url": "https://transport.karnataka.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to transport.karnataka.gov.in:443"
+ },
+ {
+  "key": "TN_transport",
+  "url": "https://tnsta.tn.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "DL_transport",
+  "url": "https://transport.delhi.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "UP_transport",
+  "url": "https://uptransport.upsdc.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "TG_transport",
+  "url": "https://transport.telangana.gov.in/",
+  "http": "200",
+  "bytes": 81312,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "KL_mvd",
+  "url": "https://mvd.kerala.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "GJ_transport",
+  "url": "https://rtogujarat.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "city_bengaluru",
+  "url": "https://btp.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "city_hyderabad",
+  "url": "https://www.hyderabadpolice.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "city_chennai",
+  "url": "https://www.chennaitrafficpolice.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "city_mumbai",
+  "url": "https://trafficpolicemumbai.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ },
+ {
+  "key": "city_pune",
+  "url": "https://punepolice.gov.in/",
+  "http": "200",
+  "bytes": 3380,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "city_kolkata",
+  "url": "https://kolkatatrafficpolice.gov.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (35) Recv failure: Connection reset by peer"
+ },
+ {
+  "key": "city_ahmedabad",
+  "url": "https://ahmedabadcitypolice.org/",
+  "http": "200",
+  "bytes": 322366,
+  "reachable": true,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": null
+ },
+ {
+  "key": "city_noida",
+  "url": "https://noidatraffic.in/",
+  "http": "000",
+  "bytes": 0,
+  "reachable": false,
+  "probed_at": "2026-09-22T12:13:25+00:00",
+  "error": "curl: (56) CONNECT tunnel failed, response 502"
+ }
+]

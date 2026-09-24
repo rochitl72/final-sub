@@ -1,0 +1,45 @@
+{
+ "road_rule_money": {
+  "resolved": 65,
+  "unresolved": 22
+ },
+ "exact_duplicate_fine_rows_removed": 244,
+ "subnational_rows_collapsed_into_cascade": 89,
+ "subnational_rows_kept": 228,
+ "state_multiplier_removed": 36,
+ "vehicle_prose_separated": {
+  "permitted_vehicles": 44,
+  "prohibited_vehicles": 29
+ },
+ "referential_repairs": [
+  "city:DIU: state_code DD -> DN (Dadra & Nagar Haveli and Daman & Diu)"
+ ],
+ "cities_added_to_spatial_index": 0,
+ "field_level_withholding": {
+  "unverified": 1406,
+  "contradicted": 838,
+  "no_citation": 54,
+  "off_topic": 21,
+  "unsupported_section": 2
+ },
+ "nodes_serveable": 1528,
+ "nodes_recognised_only": 582,
+ "nodes_in_review_queue": 1228,
+ "tier_counts": {
+  "recognised_only_city": 56,
+  "recognised_only_corridor": 132,
+  "recognised_only_fine": 279,
+  "recognised_only_road_class": 4,
+  "recognised_only_road_point": 48,
+  "recognised_only_state": 2,
+  "recognised_only_vehicle": 4,
+  "recognised_only_violation": 57,
+  "serveable_city": 518,
+  "serveable_district": 782,
+  "serveable_fine": 90,
+  "serveable_road_class": 12,
+  "serveable_state": 34,
+  "serveable_vehicle": 22,
+  "serveable_violation": 70
+ }
+}

@@ -14,7 +14,10 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC  = ROOT / "data" / "compiled" / "drivelegal_graph.json"
+# Built from the SERVING graph, which withholds every field that failed source
+# verification — so the offline bundle can never state something the online
+# service would refuse. tools/dataset/bench_parity.py asserts they agree.
+SRC  = ROOT / "data" / "compiled" / "drivelegal_graph.v5.serving.json"
 OUT  = ROOT / "apps" / "mobile" / "src" / "offline" / "drivelegal_offline.json"
 
 # Violation fields the offline engine actually uses (keeps the bundle small).
@@ -29,6 +32,17 @@ FINE_FIELDS = [
 ]
 
 
+def _sourced(node, field):
+    """True only if this field passed verification AND carries a source URL."""
+    p = ((node.get("_verification") or {}).get("fields") or {}).get(field) or {}
+    return p.get("status") == "verified" and bool(p.get("source_url"))
+
+
+def _citation(node, field):
+    p = ((node.get("_verification") or {}).get("fields") or {}).get(field) or {}
+    return {"source_url": p.get("source_url"), "retrieved_at": p.get("retrieved_at")}
+
+
 def main() -> None:
     g = json.loads(SRC.read_text(encoding="utf-8"))
     nodes, idx = g["nodes"], g["indexes"]
@@ -41,9 +55,11 @@ def main() -> None:
     states = {}
     for nid, n in nodes.items():
         if n.get("type") == "state":
+            # `multiplier` removed in v5: scaling central fines by a per-state
+            # coefficient has no basis in s.200 and was never consistent with the
+            # stored state fines. Offline must not reintroduce it.
             states[n["code"]] = {
                 "name": n.get("name"),
-                "multiplier": n.get("multiplier", 1.0),
                 "fallback_central": n.get("fallback_central", True),
             }
 
@@ -57,21 +73,32 @@ def main() -> None:
         for lst in entry.get("city", {}).values():
             referenced.update(lst)
 
-    fines = {}
+    fines, withheld = {}, 0
     for nid in referenced:
         n = nodes.get(nid)
-        if n:
-            fines[nid] = {k: n.get(k) for k in FINE_FIELDS}
+        if not n:
+            continue
+        # Same gate as the online service and the compiled SQLite: an amount with
+        # no verified source is not shipped to the device at all, so the offline
+        # engine cannot state it even if its own logic is wrong.
+        if not _sourced(n, "first_offence"):
+            withheld += 1
+            continue
+        row = {k: n.get(k) for k in FINE_FIELDS}
+        row["citation"] = _citation(n, "first_offence")
+        fines[nid] = row
 
     bundle = {
         "meta": {
             "version": g.get("meta", {}).get("version"),
-            "generated_from": "drivelegal_graph.json",
+            "generated_from": "drivelegal_graph.v5.serving.json",
             "counts": {
                 "violations": len(violations),
                 "states": len(states),
                 "fines": len(fines),
+                "fines_withheld_unsourced": withheld,
             },
+            "provenance": "every fine in this bundle carries a source_url",
         },
         "violations": violations,
         "states": states,
