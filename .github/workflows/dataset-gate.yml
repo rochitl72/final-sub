@@ -77,6 +77,15 @@ jobs:
           print(f'offline bundle OK: {n_json} fines, all sourced, matches SQLite')
           PY
 
+      - name: Web offline bundle is current and gated
+        # A committed esbuild artifact with the data inlined. It drifted once —
+        # the committed copy still carried all 702 pre-audit fine rows and no
+        # citations, months after the backend stopped serving them.
+        run: |
+          ./scripts/build_web_bundle.sh
+          git diff --exit-code apps/web/offline.bundle.js \
+            || { echo "::error::apps/web/offline.bundle.js is stale — run scripts/build_web_bundle.sh and commit"; exit 1; }
+
       - name: Backend tests
         run: |
           pip install -q pytest fastapi 'httpx<0.28' python-jose
