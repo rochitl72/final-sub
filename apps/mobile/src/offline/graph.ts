@@ -79,7 +79,7 @@ export function norm(text: string): string {
 
 // Faithful port of graph_engine._violations_by_keyword: start from the
 // precomputed keyword_to_vio index (normalised keys), then augment with each
-// violation's keywords + name + common_misconception. Must match exactly so
+// violation's keywords + name (misconception text is not indexed). Must match exactly so
 // offline resolver scores == server resolver scores.
 let _kwByNorm: Record<string, string[]> | null = null;
 export function violationsByKeyword(): Record<string, string[]> {
@@ -91,7 +91,6 @@ export function violationsByKeyword(): Record<string, string[]> {
   for (const [vcode, node] of Object.entries(B.violations)) {
     const extras: string[] = [...(node.keywords || [])];
     if (node.name) extras.push(node.name);
-    if (node.common_misconception) extras.push(node.common_misconception);
     for (const raw of extras) {
       const key = norm(raw);
       if (!key) continue;
@@ -140,17 +139,40 @@ export function getFine(
     return B.fines[nids[0]] ?? null;
   };
 
-  if (cityCode) {
-    const r = pick(fbi.city?.[cityCode], vehicleClass);
-    if (r) return { ...r, fine_source: 'city' };
+  const levels: [string, FineNode][] = [];
+  if (cityCode) { const r = pick(fbi.city?.[cityCode], vehicleClass); if (r) levels.push(['city', r]); }
+  if (stateCode) { const r = pick(fbi.state?.[stateCode], vehicleClass); if (r) levels.push(['state', r]); }
+  { const r = pick(fbi.central, vehicleClass); if (r) levels.push(['central', r]); }
+  if (!levels.length) return null;
+  const out: any = { ...levels[0][1], fine_source: levels[0][0] };
+  // Fill repeat / imprisonment from a broader schedule (port of get_fine).
+  for (const field of ['repeat_offence', 'imprisonment'] as const) {
+    if (out[field] == null || out[field] === '' || out[field] === 0) {
+      for (const [src, n] of levels.slice(1)) {
+        const v = (n as any)[field];
+        if (v != null && v !== '' && v !== 0) { out[field] = v; out[`${field}_source`] = src; break; }
+      }
+    }
   }
-  if (stateCode) {
-    const r = pick(fbi.state?.[stateCode], vehicleClass);
-    if (r) return { ...r, fine_source: 'state' };
-  }
-  const r = pick(fbi.central, vehicleClass);
-  if (r) return { ...r, fine_source: 'central' };
-  return null;
+  return out;
+}
+
+const RUPEE_RE = /(?:₹|rs\.?\s?|inr\s?)\s?(\d[\d,]*)(?:\s*[–-]\s*(?:₹\s?)?(\d[\d,]*))?/gi;
+
+/** Port of graph_engine.ground_amounts: drop clauses quoting a ₹ amount the
+ *  card doesn't carry (advice text quotes central amounts). */
+export function groundAmounts(text: string | null | undefined, allowed: Set<number>): string | null {
+  if (!text) return text ?? null;
+  if (!new RegExp(RUPEE_RE.source, 'i').test(text)) return text;
+  const clauses = text.trim().match(/.+?(?:[.;](?=\s|$)|\s[—–]\s|$)/g) || [text];
+  const kept = clauses.filter((cl) => {
+    const amts = [...cl.matchAll(new RegExp(RUPEE_RE.source, 'gi'))]
+      .flatMap((m) => [m[1], m[2]]).filter(Boolean).map((x) => parseInt(String(x).replace(/,/g, ''), 10));
+    return !amts.length || amts.every((a) => allowed.has(a));
+  }).map((c) => c.trim()).filter(Boolean);
+  let out = kept.join(' ').trim().replace(/\s*[;—–]\s*$/, '.');
+  if (out && !/[.!?)]$/.test(out)) out += '.';
+  return out;
 }
 
 /** Faithful port of graph_engine.quick_fine (base graph; no patch overlay offline). */
@@ -163,14 +185,15 @@ export function quickFine(
   const fine = getFine(violationCode, stateCode, cityCode, vehicleFineClass);
   if (!fine) return null;
   const vio = getViolation(violationCode);
+  const allowed = new Set<number>([fine.first_offence, fine.repeat_offence].filter((x): x is number => typeof x === 'number' && x > 0));
   return {
     violation_code: violationCode,
     violation_name: vio ? vio.name : violationCode,
     mv_section: vio ? vio.mv_section : null,
     compoundable: vio ? vio.compoundable : false,
-    what_to_do_next: vio ? vio.what_to_do_next : null,
-    tips_to_avoid: vio ? vio.tips_to_avoid : null,
-    licence_consequence: vio ? (vio.dl_consequence || vio.consequence) : null,
+    what_to_do_next: vio ? groundAmounts(vio.what_to_do_next, allowed) : null,
+    tips_to_avoid: vio ? groundAmounts(vio.tips_to_avoid, allowed) : null,
+    licence_consequence: vio ? groundAmounts(vio.dl_consequence || vio.consequence, allowed) : null,
     fine_first: fine.first_offence,
     fine_repeat: fine.repeat_offence,
     imprisonment: fine.imprisonment,

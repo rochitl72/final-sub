@@ -43,6 +43,7 @@ calls `llm_chatbot.handle_freeform` and re-packages its output as an
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import uuid
 from typing import Callable, Dict, List, Optional
@@ -387,6 +388,10 @@ class DialogManager:
 
         if message:
             clipped = message[:MAX_MESSAGE_LEN]
+            # "fine for no helmet in Mumbai" → price it for Mumbai. (With an
+            # answer already on screen, smart relocation handles this instead.)
+            if s.get("state_code") and not s.get("last_fine_card"):
+                self._apply_location_mention(s, clipped)
             # Free-form clarification the user typed after picking "Something else".
             if s.get("pending_slot") == "clarify_freeform":
                 s["pending_slot"] = None
@@ -412,6 +417,9 @@ class DialogManager:
                 and self.dynamic_fn
                 and _location_bootstrap_done(s)
             ):
+                relocate = self._relocate_from_text(s, clipped)
+                if relocate is not None:
+                    return relocate
                 try:
                     out = self.dynamic_fn(s, clipped)
                 except Exception:
@@ -499,7 +507,7 @@ class DialogManager:
         """Build a single checkbox clarification covering the driver-context
         unknowns (licence, repeat offence, minor). Returns None when there's
         nothing left to ask."""
-        if s.get("_driver_context_done"):
+        if s.get("_driver_context_done") or s.get("_driver_context_offered"):
             return None
         from clarification_engine import build_driver_context_clarification
         return build_driver_context_clarification()
@@ -851,7 +859,10 @@ class DialogManager:
             _template_narrate_reply,
         )
 
-        vc = s["violation_code"]
+        from nlu import adjust_for_vehicle
+        vc = adjust_for_vehicle(s["violation_code"], s.get("vehicle_segment"),
+                                s.get("last_user_story") or "")
+        s["violation_code"] = vc
         card = self.engine.quick_fine(
             violation_code     = vc,
             state_code         = s.get("state_code"),
@@ -906,6 +917,7 @@ class DialogManager:
         selection_mode = "single"
         allow_other = False
         if followup:
+            s["_driver_context_offered"] = True
             reply = reply.rstrip() + "\n\n" + followup["question"]
             chips = followup["chips"]
             multi_select = True
@@ -941,7 +953,9 @@ class DialogManager:
         # extraction loop owns road / vehicle / violation slots.
         if s.get("mode") == "dynamic":
             return None
-        if not s.get("road_bucket"):
+        # Road type only narrows the violation list; once the violation is
+        # known (e.g. from a typed story) it isn't needed for the fine.
+        if not s.get("road_bucket") and not s.get("violation_code"):
             return "road_bucket"
         if not s.get("vehicle_segment"):
             return "vehicle_segment"
@@ -1056,6 +1070,11 @@ class DialogManager:
             scoped["session_state"] = _summary(s)
             return scoped
 
+        # Calculator: understand typed text before treating it as a chip answer.
+        pre = self._calculator_pre(s, message)
+        if pre is not None:
+            return pre
+
         slot = self._next_missing_slot(s)
 
         # 1. State / city slot → try the location resolver.
@@ -1135,7 +1154,288 @@ class DialogManager:
             # Zero matches → LLM freeform.
             return self._freeform(s, message)
 
-        # 5. Already answered → treat as follow-up → LLM freeform.
+        # 5. Already answered → follow-up / relocation / new violation / LLM.
+        return self._after_answer(s, message)
+
+    def _with_reask(self, s: dict, out: dict) -> dict:
+        """Info reply during slot-filling → append the pending question + chips
+        so the calculator flow can continue."""
+        out = dict(out)
+        out["intent"] = out.get("intent") if out.get("intent") != "narrate" else "answer"
+        if self._next_missing_slot(s) and s.get("stage") != "answered":
+            nxt = self.next_turn(s)
+            q = nxt.get("question") or ""
+            if q:
+                out["reply"] = f"{(out.get('reply') or '').rstrip()}\n\n{q}"
+                out["question"] = out["reply"]
+            for k in ("slot", "chips", "multi_select", "selection_mode", "allow_text", "allow_other"):
+                if k in nxt:
+                    out[k] = nxt[k]
+        out["session_state"] = _summary(s)
+        return out
+
+    def _calculator_pre(self, s: dict, message: str) -> Optional[dict]:
+        """Calculator mode, before an answer exists: handle guardrail / small
+        talk / FAQ / info questions, and harvest every slot a typed story
+        contains ("riding my bike without a helmet on a city street" fills
+        vehicle + violation + road at once) instead of re-asking one chip."""
+        if s.get("mode") == "dynamic" or self._next_missing_slot(s) is None:
+            return None          # answered → _after_answer owns the turn
+        from dynamic_chatbot import (
+            guardrail_response, _pre_route, classify_intent, _handle_documents,
+            _handle_license_guidance, _handle_post_incident, _set_vehicle,
+        )
+        from clarification_engine import looks_like_incident
+        import nlu
+
+        guard = guardrail_response(message)
+        if guard is not None:
+            s["messages"].append({"role": "user", "content": message})
+            s["messages"].append({"role": "assistant", "content": guard["reply"]})
+            return self._with_reask(s, guard)
+
+        pre = _pre_route(s, message, self.engine, calculator=True)
+        if pre is not None:
+            return self._with_reask(s, pre)
+
+        ranked = self.violator.resolve(
+            nlu.mask_followup_terms(message),
+            road_bucket=s.get("road_bucket"),
+            vehicle_fine_class=s.get("vehicle_fine_class"),
+        )
+        offence = ranked[0][0] if ranked and self.violator.is_deterministic(ranked) else None
+
+        intent = classify_intent(message)
+        info = None
+        if not (offence and (nlu.is_fine_query(message) or nlu.has_enforcement_context(message))):
+            if intent == "post_incident" or looks_like_incident(message):
+                info = _handle_post_incident(s, message)
+            elif intent == "documents":
+                info = _handle_documents(s, message)
+            elif intent == "license_guidance":
+                info = _handle_license_guidance(s, message)
+        if info is not None:
+            s["messages"].append({"role": "user", "content": message})
+            s["messages"].append({"role": "assistant", "content": info.get("reply", "")})
+            return self._with_reask(s, {"intent": "answer", "reply": info.get("reply", ""),
+                                        "fine_card": None})
+
+        # Harvest slots from the story (never overwrite what's already set).
+        filled = []
+        pending = self._next_missing_slot(s)
+        from clarification_engine import is_traffic_related, _OUT_OF_SCOPE_REPLY
+        if (pending not in ("state_code", "city_code") and not ranked
+                and len(message.split()) > 3 and not is_traffic_related(message)):
+            s["messages"].append({"role": "user", "content": message})
+            return self._with_reask(s, {"intent": "answer", "reply": _OUT_OF_SCOPE_REPLY,
+                                        "fine_card": None, "scope": "out_of_scope"})
+        if s.get("state_code"):
+            seg = self.engine.detect_vehicle_segment(message) or (
+                nlu.vehicle_from_violation(offence) if offence else None)
+            if seg and not s.get("vehicle_segment"):
+                _set_vehicle(s, seg)
+                filled.append("vehicle_segment")
+            if offence and not s.get("violation_code"):
+                s["violation_code"] = offence
+                filled.append("violation_code")
+            if not s.get("road_bucket"):
+                ml = f" {message.lower()} "
+                for kw, bucket in ((" highway", "highway"), ("expressway", "highway"),
+                                   (" main road", "main_road"), ("city street", "street"),
+                                   (" street", "street"), ("residential", "street"),
+                                   (" colony", "street")):
+                    if kw in ml:
+                        s["road_bucket"] = bucket
+                        filled.append("road_bucket")
+                        break
+        # Only take over when the story gave us something beyond (or other
+        # than) a plain answer to the pending chip question.
+        if filled and (len(filled) > 1 or filled[0] != pending):
+            s["messages"].append({"role": "user", "content": message})
+            if offence:
+                s["last_user_story"] = message
+            s["pending_slot"] = None
+            return self.next_turn(s)
+        # Undo a lone fill of the pending slot — the normal slot parser below
+        # handles that case with its own messages.
+        for f in filled:
+            if f == "vehicle_segment":
+                s["vehicle_segment"] = s["vehicle_fine_class"] = s["vehicle_type"] = None
+            else:
+                s[f] = None
+        return None
+
+    def _set_state_with_capital(self, s: dict, state: str) -> None:
+        """State named without a city → use its capital (shown in the answer),
+        so chat-mode sessions don't stall waiting for a city."""
+        s["state_code"], s["city_code"], s["city_name"] = state, None, None
+        st = next((x for x in self.catalogs.states() if x["code"] == state), None)
+        cap = (st or {}).get("capital")
+        if cap:
+            d = self.locator.disambiguate(cap, state)
+            c = next((c for c in (d.get("candidates") or []) if c["state_code"] == state), None)
+            if c:
+                s["city_code"], s["city_name"] = c["code"], c["name"]
+
+    def _apply_location_mention(self, s: dict, message: str) -> bool:
+        """Switch location when the text names a place after in/at/near/from."""
+        for m in re.finditer(r"\b(?:in|at|near|around|from)\s+([a-z][a-z .'-]{2,40})", message, re.I):
+            phrase = re.split(r"\b(?:for|on|with|while|and|but|because|yesterday|today|last)\b|[,.?!]",
+                              m.group(1), flags=re.I)[0].strip()
+            if not phrase or len(phrase) < 3:
+                continue
+            d = self.locator.disambiguate(phrase)
+            cands = d.get("candidates") or []
+            state = None
+            city = None
+            if cands and len({c["state_code"] for c in cands}) == 1:
+                state = cands[0]["state_code"]
+                if not d.get("ambiguous"):
+                    city = cands[0]
+            else:
+                state = self.locator.parse_state(phrase)
+            if state and (state != s.get("state_code") or (city and city["code"] != s.get("city_code"))):
+                if city:
+                    s["state_code"], s["city_code"], s["city_name"] = state, city["code"], city["name"]
+                else:
+                    self._set_state_with_capital(s, state)
+                return True
+        # "drunk driving fine delhi" — a bare place name closing a fine question.
+        if re.search(r"\b(fine|challan|penalty|charge)\b", message, re.I):
+            words = re.findall(r"[a-z]+", message.lower())
+            for n in (2, 1):
+                if len(words) <= n:
+                    continue
+                tail = " ".join(words[-n:])
+                d = self.locator.disambiguate(tail)
+                cands = [c for c in (d.get("candidates") or [])
+                         if c["name"].lower().startswith(tail.split()[0])]
+                if cands and len({c["state_code"] for c in cands}) == 1:
+                    c0 = cands[0]
+                    if c0["state_code"] != s.get("state_code") or c0["code"] != s.get("city_code"):
+                        s["state_code"] = c0["state_code"]
+                        s["city_code"], s["city_name"] = c0["code"], c0["name"]
+                        return True
+                st = self.locator.parse_state(tail)
+                if st and len(tail) > 3 and st != s.get("state_code"):
+                    self._set_state_with_capital(s, st)
+                    return True
+        return False
+
+    def _relocate_from_text(self, s: dict, message: str) -> Optional[dict]:
+        """"What if I was in Bangalore?" → re-price the answered violation.
+
+        Only fires once an answer exists and the text names a different
+        state/city unambiguously; otherwise returns None."""
+        if s.get("stage") != "answered" or not s.get("violation_code"):
+            return None
+        disamb = self.locator.disambiguate(message)
+        cands  = disamb.get("candidates") or []
+        new_state = new_city = new_city_name = None
+        if cands and len({c["state_code"] for c in cands}) == 1:
+            new_state = cands[0]["state_code"]
+            if not disamb.get("ambiguous"):
+                new_city, new_city_name = cands[0]["code"], cands[0]["name"]
+        elif not cands:
+            new_state = self.locator.parse_state(message)
+        if not new_state or (new_state == s.get("state_code")
+                             and (not new_city or new_city == s.get("city_code"))):
+            return None
+        s.setdefault("messages", []).append({"role": "user", "content": message})
+        out = self._maybe_relocate(
+            s, new_state=new_state, new_city=new_city, new_city_name=new_city_name,
+        )
+        if out is None:
+            s["messages"].pop()
+        return out
+
+    def _after_answer(self, s: dict, message: str) -> dict:
+        """Free text once the calculator has produced an answer.
+
+        Deterministic paths first (all offline, instant, graph-grounded):
+          1. safety guardrail (bribery / forgery / evasion)
+          2. "what if in Bangalore?"  → smart relocation of the same violation
+          3. a clearly different violation → re-answer with the same context
+          4. "is it compoundable?" etc. → answer from the last fine card
+        Everything else goes to the LLM (which itself falls back offline).
+        """
+        from dynamic_chatbot import guardrail_response
+        from followups import followup_reply
+
+        def _reply(out: dict) -> dict:
+            s["messages"].append({"role": "user", "content": message})
+            s["messages"].append({"role": "assistant", "content": out.get("reply") or ""})
+            out["session_state"] = _summary(s)
+            return out
+
+        guard = guardrail_response(message)
+        if guard is not None:
+            return _reply({**guard, "intent": "answer"})
+
+        # Shared understanding layer: small talk, FAQ, recall, vehicle
+        # what-ifs, follow-ups, several offences in one message.
+        from dynamic_chatbot import _pre_route
+        pre = _pre_route(s, message, self.engine, calculator=True)
+        if pre is not None:
+            pre = dict(pre)
+            if pre.get("intent") == "narrate":
+                pre["intent"] = "answer"
+            pre["session_state"] = _summary(s)
+            return pre
+
+        # Accident procedure / paperwork / licence how-to → canned, grounded.
+        from clarification_engine import looks_like_incident
+        from dynamic_chatbot import (
+            classify_intent, _handle_documents, _handle_license_guidance,
+            _handle_post_incident,
+        )
+        intent = classify_intent(message)
+        handler = (
+            _handle_post_incident if intent == "post_incident" or looks_like_incident(message)
+            else _handle_documents if intent == "documents"
+            else _handle_license_guidance if intent == "license_guidance"
+            else None
+        )
+        if handler is not None:
+            out = handler(s, message)
+            return _reply({"intent": "answer", "reply": out.get("reply", ""),
+                           "fine_card": None})
+
+        # 2. Location change on an answered violation.
+        relocate = self._relocate_from_text(s, message)
+        if relocate is not None:
+            return relocate
+
+        # 3. A different violation named outright.
+        ranked = self.violator.resolve(
+            message,
+            road_bucket=s.get("road_bucket"),
+            vehicle_fine_class=s.get("vehicle_fine_class"),
+        )
+        if (self.violator.is_deterministic(ranked)
+                and ranked[0][0] != s.get("violation_code")):
+            s["messages"].append({"role": "user", "content": message})
+            veh = self.engine.match_vehicle(message)
+            seg = veh[0].get("segment") if veh else None
+            if seg in SEGMENT_FINE_CLASS:
+                s["vehicle_segment"]    = seg
+                s["vehicle_fine_class"] = SEGMENT_FINE_CLASS[seg]
+                s["vehicle_type"]       = SEGMENT_LABEL.get(seg, seg)
+            return self._apply_slot(s, "violation_code", ranked[0][0])
+
+        # 4. Follow-up about the current answer.
+        reply = followup_reply(message, s.get("last_fine_card"))
+        if reply:
+            return _reply({"intent": "answer", "reply": reply,
+                           "fine_card": s.get("last_fine_card")})
+
+        # Nothing traffic-related at all → polite out-of-scope (no LLM tokens).
+        from clarification_engine import is_traffic_related, _OUT_OF_SCOPE_REPLY
+        referential = bool(re.search(r"\b(this|that|it|this one)\b", message, re.I)) and len(message.split()) <= 12
+        if not is_traffic_related(message) and not ranked and not referential:
+            return _reply({"intent": "answer", "reply": _OUT_OF_SCOPE_REPLY,
+                           "fine_card": None, "scope": "out_of_scope"})
+
         return self._freeform(s, message)
 
     # ── Slot application (chip + explicit slot endpoint) ──────────────────────
@@ -1286,8 +1586,18 @@ class DialogManager:
 
         diff = _diff_fine_cards(prev_card, new_card)
         loc  = s.get("city_name") or s.get("state_code") or "the new location"
-        reason = _diff_reason(diff).rstrip(".")
-        reply  = f"Updated the fine for {loc}. The amount changed because {reason}."
+        prev_loc = prev_city_name or prev_state or "before"
+        def _rs(c):
+            v = (c or {}).get("fine_first")
+            return f"₹{int(v):,}" if isinstance(v, (int, float)) and v else "not specified"
+        name = (new_card or prev_card or {}).get("violation_name", "this offence")
+        now, before = _rs(new_card), _rs(prev_card)
+        if now == before:
+            reply = f"In **{loc}**, **{name}** is also **{now}** for a first offence — same as {prev_loc}."
+        else:
+            reason = _diff_reason(diff).rstrip(".")
+            reply = (f"In **{loc}**, **{name}** is **{now}** for a first offence "
+                     f"(vs {before} in {prev_loc}) — {reason}.")
         s["messages"].append({"role": "assistant", "content": reply})
 
         return {
@@ -1339,6 +1649,9 @@ class DialogManager:
     # ── Final answer assembly ─────────────────────────────────────────────────
 
     def _answer(self, s: dict) -> dict:
+        from nlu import adjust_for_vehicle
+        s["violation_code"] = adjust_for_vehicle(s["violation_code"], s.get("vehicle_segment"),
+                                                 s.get("last_user_story") or "")
         card = self.engine.quick_fine(
             s["violation_code"],
             state_code=s.get("state_code"),
@@ -1366,7 +1679,8 @@ class DialogManager:
                 "Try a different violation or rephrase your question."
             )
         first  = f"₹{card['fine_first']:,}"  if card.get("fine_first")  else "varies"
-        repeat = f"₹{card['fine_repeat']:,}" if card.get("fine_repeat") else "varies"
+        repeat = (f"₹{card['fine_repeat']:,}" if card.get("fine_repeat")
+                  else "same as first (no separate repeat amount)")
         imp    = f" • Imprisonment: {card['imprisonment']}" if card.get("imprisonment") else ""
         sec    = f" (MV Act §{card['mv_section']})" if card.get("mv_section") else ""
         src    = card.get("fine_source", "central")
@@ -1392,6 +1706,8 @@ class DialogManager:
         fine_card = out.get("fine_card")
         if fine_card:
             s["last_fine_card"] = fine_card
+            if fine_card.get("violation_code"):
+                s["violation_code"] = fine_card["violation_code"]
         s["messages"].append({"role": "assistant", "content": reply})
         s["stage"] = "answered"
         return {

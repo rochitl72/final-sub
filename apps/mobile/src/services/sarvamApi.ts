@@ -118,7 +118,7 @@ export async function textToSpeech(
       return {
         ok: false,
         audioBase64: null,
-        errorMessage: '🔇 Voice unavailable — add SARVAM_API_KEY to drivelegal/.env and restart',
+        errorMessage: '🔇 Voice unavailable — add SARVAM_API_KEY to the repo-root .env and restart',
       };
     }
     if (status === 401) {

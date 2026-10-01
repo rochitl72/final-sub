@@ -389,6 +389,12 @@ def _handle_post_incident(session: dict, text: str) -> dict:
     if graph_steps:
         body += "\n\n**Specific to your situation:**\n" + _format_steps(graph_steps[:3])
     body += f"\n\n*Reference: {citations}.*"
+    from clarification_engine import is_victim_report, victim_fled
+    if is_victim_report(text) and victim_fled(text):
+        body += ("\n\n**If the other driver fled (hit-and-run):** note the vehicle number, colour "
+                 "and direction, look for CCTV/dashcam footage and witnesses, and file an FIR — "
+                 "victims can claim compensation under the Hit and Run Motor Accidents Scheme "
+                 "(₹2 lakh for death, ₹50,000 for grievous injury).")
     return _bot_reply(f"{intro}\n\n{body}")
 
 
@@ -763,8 +769,9 @@ _GUARDRAIL_UNSAFE_RE = re.compile(
     r"fake\s+(licen[cs]e|rc|puc|number\s*plate|plate|insurance|challan)|"
     r"forged?\s+(licen[cs]e|rc|puc|document|plate)|"
     r"duplicate\s+(number\s*plate|plate)|"
-    r"(avoid|escape|evade|dodge|get\s+out\s+of|wriggle\s+out\s+of)\s+"
-    r"(the\s+)?(fine|challan|chalan|penalty|cop|police|checkpost|check\s*post|rto)|"
+    r"(avoid|escape|evade|dodge|get\s+out\s+of|wriggle\s+out\s+of|skip)\s+"
+    r"(?:(?:paying|pay|the|this|that|my|a)\s+){0,3}"
+    r"(fine|challan|chalan|penalty|cop|police|checkpost|check\s*post|rto)|"
     r"how\s+(to|do\s+i)\s+(not\s+)?(get\s+)?(caught|fined|challan)"
     r")\b",
     re.IGNORECASE,
@@ -788,10 +795,11 @@ def guardrail_response(text: str) -> Optional[dict]:
     to legitimate queries and guarantees a safe answer for unsafe ones."""
     if not text:
         return None
-    if _GUARDRAIL_UNSAFE_RE.search(text):
+    from nlu import is_unsafe
+    if is_unsafe(text):
         return {
             "intent":       "narrate",
-            "reply":        _GUARDRAIL_UNSAFE_REPLY,
+            "reply":        __import__("nlu").UNSAFE_REPLY,
             "fine_card":    None,
             "detail_table": None,
             "chips":        None,
@@ -830,6 +838,19 @@ def _route_conversation(session: dict, text: str) -> Optional[dict]:
     generic extract loop, else None."""
     intent = classify_intent(text)
 
+    # A named offence asked about as a fine ("fine for not reporting an
+    # accident?") or described as being caught ("driving without a licence",
+    # "insurance expired and police stopped me") is a FINE question — not the
+    # accident procedure or a document explainer.
+    import nlu
+    from clarification_engine import is_victim_report
+    offence = None if is_victim_report(text) else resolve_violation_from_text(
+        text, session.get("road_bucket"), session.get("vehicle_segment")).get("match")
+    if offence and (nlu.is_fine_query(text)
+                    or (intent in ("documents", "license_guidance")
+                        and nlu.has_enforcement_context(text))):
+        return None
+
     # ── Accident / animal collision ───────────────────────────────────────────
     if intent == "post_incident" or looks_like_incident(text):
         session["conversation_mode"] = "incident"
@@ -861,6 +882,11 @@ def _route_conversation(session: dict, text: str) -> Optional[dict]:
         }
 
     # ── Ongoing incident thread ─────────────────────────────────────────────
+    # A clearly named offence leaves the incident thread.
+    if session.get("conversation_mode") == "incident" and offence:
+        session["conversation_mode"] = None
+        session["pending_slot"] = None
+        return None
     if session.get("conversation_mode") == "incident":
         if is_violation_denial(text):
             session["violation_code"] = None
@@ -904,23 +930,31 @@ def _route_conversation(session: dict, text: str) -> Optional[dict]:
                     "fine_card": None}
 
     # ── Slot-only age reply (not in incident mode) ──────────────────────────
+    # Only a short age statement ("I'm 17", "he is 16") — an age inside a
+    # story ("my 16 year old son was driving") must still reach violation
+    # matching (→ underage driving).
     age = parse_age(text)
+    if age is not None and (offence or len(text.split()) > 6):
+        if session.get("driver_age") is None:
+            session["driver_age"] = age
+        age = None
     if age is not None and session.get("driver_age") is None:
         session["driver_age"] = age
         if text:
             session.setdefault("messages", []).append(
                 {"role": "user", "content": text}
             )
-        reply = (
-            f"Got it — you're {age}. "
-            + (
-                "Since you're under 18, guardian liability rules may apply for "
-                "certain offences (MV Act §199A)."
-                if age < 18 else
-                "Tell me a bit more about what happened and I'll find the "
-                "exact rule and fine."
-            )
-        )
+        card = session.get("last_fine_card")
+        if age < 18:
+            reply = (f"Noted — the rider/driver is {age}, a minor. Under **MV Act §199A** the "
+                     "guardian or vehicle owner is held responsible: a ₹25,000 fine and up to "
+                     "3 years' imprisonment, the vehicle's registration can be cancelled for a "
+                     "year, and the minor can't get a licence until 25."
+                     + (f" That's on top of the **{card.get('violation_name')}** fine." if card else ""))
+        else:
+            reply = (f"Got it — {age}. " + (
+                "That doesn't change this fine — adult rules apply." if card else
+                "Tell me a bit more about what happened and I'll find the exact rule and fine."))
         session.setdefault("messages", []).append(
             {"role": "assistant", "content": reply}
         )
@@ -1316,6 +1350,7 @@ def _call_narrate_llm(
             user_text,
             temperature = NARRATE_GEN_OPTIONS.get("temperature", 0.4),
             max_tokens  = NARRATE_GEN_OPTIONS.get("num_predict", 280),
+            reasoning   = True,     # only unmatched / open questions reach here
         )
         log.debug("narrate: Groq OK (%d chars)", len(raw))
         return raw
@@ -1464,7 +1499,16 @@ def _parse_protocol(raw_reply: str) -> dict:
 
     # Strip whole-line protocol artefacts, then collapse any trailing
     # whitespace so the bubble doesn't get a dangling newline.
-    cleaned = _PROTOCOL_LINE_RE.sub("", raw_reply or "")
+    # The protocol block terminates the message; models sometimes keep
+    # talking after it (a second, duplicate answer). Keep only what precedes it.
+    raw_reply = raw_reply or ""
+    first_block = re.search(r"<<\s*(SLOTS|CHIPS)\b", raw_reply, re.I)
+    if first_block and raw_reply[:first_block.start()].strip():
+        tail = raw_reply[first_block.start():]
+        # keep protocol lines themselves (parsed above / below), drop stray prose
+        tail_blocks = "\n".join(re.findall(r"<<.*?>>", tail, re.S))
+        raw_reply = raw_reply[:first_block.start()] + "\n" + tail_blocks
+    cleaned = _PROTOCOL_LINE_RE.sub("", raw_reply)
     # Also handle inline (non-line-anchored) protocol tags as a fallback.
     cleaned = _SLOTS_BLOCK_RE.sub("", cleaned)
     cleaned = _CHIPS_RE.sub("", cleaned)
@@ -1482,10 +1526,20 @@ def _parse_protocol(raw_reply: str) -> dict:
     return {"slots": slots, "chips": chips, "clean_reply": cleaned}
 
 
-def _apply_extracted_slots(session: dict, slots: dict) -> None:
+def _apply_extracted_slots(session: dict, slots: dict, evidence: Optional[str] = None) -> None:
     """Update session slots from the parsed protocol. Never overwrites a
-    value that was already set explicitly (e.g. via location bootstrap)."""
+    value that was already set explicitly (e.g. via location bootstrap).
+
+    *evidence*: the user's recent text. When given (LLM output), a vehicle is
+    only accepted if the user actually mentioned it or the offence implies it
+    — the model used to assume "car" for "I jumped a red light"."""
     eng = get_graph_engine()
+    if evidence is not None:
+        import nlu
+        vs_llm = slots.get("vehicle_segment")
+        if vs_llm not in (None, "?") and vs_llm != eng.detect_vehicle_segment(evidence) \
+                and vs_llm != nlu.vehicle_from_violation(slots.get("violation_code")):
+            slots = {**slots, "vehicle_segment": "?"}
 
     rb = slots.get("road_bucket")
     if rb in _ALLOWED_ROAD_BUCKETS and not session.get("road_bucket"):
@@ -1556,6 +1610,317 @@ def _build_detail_table(fine_card: dict) -> List[dict]:
     return rows
 
 
+_SPEED_LIMIT_Q_RE = re.compile(
+    r"\b(speed\s+limits?|max(imum)?\s+speed|how\s+fast\s+can\s+i)\b", re.I)
+
+_STORY_START_RE = re.compile(
+    r"\b(yesterday|last\s+night|tonight|today|this\s+(morning|evening)|so\s+i|"
+    r"i\s+was\s+(coming|going|heading|returning|on\s+my\s+way)|on\s+my\s+way)\b", re.I)
+
+
+def _reply_turn(session: dict, text: str, reply: str, **extra) -> dict:
+    """Record a deterministic turn in history and return a narrate envelope."""
+    if text:
+        session.setdefault("messages", []).append({"role": "user", "content": text})
+    session.setdefault("messages", []).append({"role": "assistant", "content": reply})
+    out = {"intent": "narrate", "reply": reply, "fine_card": None,
+           "detail_table": None, "chips": None, "explanation": None}
+    out.update(extra)
+    return out
+
+
+def _set_vehicle(session: dict, seg: Optional[str]) -> None:
+    if seg in SEGMENT_FINE_CLASS:
+        session["vehicle_segment"]    = seg
+        session["vehicle_fine_class"] = SEGMENT_FINE_CLASS.get(seg)
+        session["vehicle_type"]       = SEGMENT_LABEL.get(seg, seg)
+
+
+def grounded_answer(session: dict, vcode: str, *, lead: str = "") -> Tuple[str, Optional[dict]]:
+    """Graph-grounded fine reply + card for *vcode* in the session's context.
+    Every number, section and consequence comes from the knowledge graph."""
+    from offline_engine import _build_fine_response
+    eng = get_graph_engine()
+    card = eng.quick_fine(
+        violation_code     = vcode,
+        state_code         = session.get("state_code"),
+        city_code          = session.get("city_code"),
+        vehicle_fine_class = session.get("vehicle_fine_class"),
+    )
+    body = _build_fine_response(session, vcode)
+    reply = f"{lead.strip()}\n\n{body}" if lead and lead.strip() else body
+    return reply, card
+
+
+def _answer_violation(session: dict, text: str, vcode: str, *, lead: str = "",
+                      intent: str = "narrate", **extra) -> dict:
+    import nlu
+    vcode = nlu.adjust_for_vehicle(vcode, session.get("vehicle_segment"),
+                                   session.get("last_user_story") or text or "")
+    reply, card = grounded_answer(session, vcode, lead=lead)
+    session["violation_code"] = vcode
+    if card:
+        session["last_fine_card"] = card
+        session["stage"] = "answered"
+    explanation = _build_explanation(
+        session, vcode, card, match_method=extra.pop("match_method", "keyword"),
+        match_confidence="high",
+    ) if card else None
+    chips = None
+    multi = {}
+    # One-time driver-context checkboxes (repeat offence / no licence / minor
+    # change the outcome) — offered on the first answer of a conversation only.
+    if (card and intent == "narrate" and not session.get("_driver_context_done")
+            and not session.get("_driver_context_offered")):
+        session["_driver_context_offered"] = True
+        fu = build_driver_context_clarification()
+        reply = reply.rstrip() + "\n\n" + fu["question"]
+        chips = fu["chips"]
+        multi = {"multi_select": True, "selection_mode": "multi", "allow_other": True,
+                 "allow_text": True}
+        session["pending_multi"] = "driver_context"
+    out = _reply_turn(session, text, reply, intent=intent, fine_card=card,
+                      detail_table=_build_detail_table(card) if card else None,
+                      explanation=explanation, chips=chips, **multi)
+    out.update({k: v for k, v in extra.items() if not (k == "explanation" and v is None)})
+    return out
+
+
+_HINGLISH_RE = re.compile(
+    r"\b(hai|tha|thi|ke|ki|ka|ne|nahi|nahin|mera|meri|mujhe|bina|kya|kaise|kyun|aur|"
+    r"pakda|pakad|chala|chalate|raha|rahi|gaadi|gadi|bhai|yaar|kar|diya|liya)\b", re.I)
+_HINGLISH_MIN = 2
+
+
+def _llm_lead(session: dict, text: str, vcode: str) -> str:
+    """Cloud mode only: one or two warm, FACT-FREE sentences from the LLM to
+    open a grounded answer. Tiny prompt (~150 tokens) instead of the ~1.7k
+    narrate prompt; anything factual it says is stripped by sanitize_lead,
+    and any failure just returns "" (the grounded template stands alone)."""
+    if not text or is_short_slot_answer(text) or len(text.split()) < 4:
+        return ""
+    try:
+        from llm_chatbot import call_groq_narrate
+        import nlu
+        name = (get_graph_engine().get_violation(vcode) or {}).get("name", vcode)
+        hinglish = len({m.lower() for m in _HINGLISH_RE.findall(text)}) >= _HINGLISH_MIN
+        lang = "Hinglish (Hindi in Latin script), like the user" if hinglish else "English"
+        system = (
+            "You are DriveLegal, a warm, concise Indian traffic-law assistant. The user's "
+            f"situation has been identified as: {name}. Write exactly ONE short sentence in {lang} "
+            "that acknowledges what happened to them, in plain words. Do NOT give advice or "
+            "tips (an official tip follows separately), do NOT mention money, fines, rupees, "
+            "sections, laws or penalties, and do NOT ask questions. No markdown."
+        )
+        raw = call_groq_narrate(system, [], text, temperature=0.4, max_tokens=60)
+        raw = _PROTOCOL_LINE_RE.sub("", raw or "")
+        return nlu.sanitize_lead(raw, max_sentences=1)
+    except Exception as exc:          # offline / rate-limited / anything
+        log.info("lead: LLM unavailable (%s) — template only", exc)
+        return ""
+
+
+def _pre_route(session: dict, text: str, eng, *, calculator: bool = False) -> Optional[dict]:
+    """Everything that can be answered deterministically before violation
+    matching / the LLM. Order matters: specific intents first."""
+    import nlu
+
+    if not text:
+        return None
+
+    # Answer to our own "what vehicle were you on?" question.
+    if (session.get("pending_slot") == "vehicle_segment" and session.get("violation_code")
+            and not session.get("last_fine_card")):
+        seg = eng.detect_vehicle_segment(text)
+        if seg:
+            session["pending_slot"] = None
+            _set_vehicle(session, seg)
+            return _answer_violation(session, text, session["violation_code"])
+
+    small = nlu.smalltalk_reply(text)
+    if small:
+        return _reply_turn(session, text, small)
+
+    card = session.get("last_fine_card")
+    masked = nlu.mask_followup_terms(text)
+    resolved = resolve_violation_from_text(
+        masked, session.get("road_bucket"), session.get("vehicle_segment"), eng)
+    new_match = resolved.get("match")
+    is_question = bool(re.match(r"\s*(what|how|is|are|can|could|do|does|will|would|should|why|when|where|which)\b",
+                                text, re.I)) or text.strip().endswith("?")
+
+    if _SPEED_LIMIT_Q_RE.search(text):
+        from offline_engine import _speed_limit_response
+        bucket = ("highway" if re.search(r"\b(highways?|expressways?|nh|sh)\b", text, re.I)
+                  else "street" if re.search(r"\b(city|streets?|residential|school)\b", text, re.I)
+                  else session.get("road_bucket"))
+        return _reply_turn(session, text, _speed_limit_response({**session, "road_bucket": bucket}))
+
+    faq = nlu.faq_reply(text)
+    if faq and (is_question or not new_match):
+        return _reply_turn(session, text, faq)
+
+    meta = nlu.meta_reply(text, session)
+    if meta:
+        return _reply_turn(session, text, meta, fine_card=None)
+
+    # "what if it was a truck?" → same offence, new vehicle (or its sibling).
+    seg = nlu.vehicle_what_if(text, session)
+    if seg and card and not (new_match and new_match["code"] != card.get("violation_code")):
+        prev = card
+        vcode = card["violation_code"]
+        note = ""
+        if not nlu.violation_applies(vcode, seg):
+            sib = nlu.sibling_for_vehicle(vcode, seg, session.get("last_user_story") or "")
+            if not sib:
+                name = (eng.get_violation(vcode) or {}).get("name", vcode)
+                return _reply_turn(session, text,
+                    f"**{name}** only applies to {SEGMENT_LABEL.get(session.get('vehicle_segment'), 'the original vehicle')}"
+                    f" — it doesn't apply to a {SEGMENT_LABEL.get(seg, seg).lower()}. "
+                    "Tell me what happened with that vehicle and I'll find the right rule.")
+            note = (f"For a {SEGMENT_LABEL.get(seg, seg).lower()} the matching rule is "
+                    f"**{(eng.get_violation(sib) or {}).get('name', sib)}**.")
+            vcode = sib
+        _set_vehicle(session, seg)
+        out = _answer_violation(session, text, vcode, lead=note, intent="answer_updated",
+                                previous_fine_card=prev)
+        return out
+
+    # "difference between this and drug driving" → side-by-side, grounded.
+    if card and new_match and new_match["code"] != card.get("violation_code") \
+            and re.search(r"\b(difference|differ\w*|compare\w*|comparison|vs\.?|versus)\b", text, re.I):
+        other = eng.quick_fine(new_match["code"], session.get("state_code"),
+                               session.get("city_code"), session.get("vehicle_fine_class"))
+        if other:
+            def _row(c):
+                sec = f"MV Act §{c['mv_section']}" if c.get("mv_section") else "—"
+                rep = f" · repeat {nlu._fmt(c.get('fine_repeat'))}" if c.get("fine_repeat") else ""
+                imp = f" · imprisonment: {c['imprisonment']}" if c.get("imprisonment") else ""
+                comp = "compoundable" if c.get("compoundable") else "not compoundable (court)"
+                return (f"**{c['violation_name']}** — {sec}: {nlu._fmt(c.get('fine_first'))} first offence"
+                        f"{rep}{imp}; {comp}.")
+            reply = ("Here's how they compare in "
+                     f"{session.get('city_name') or session.get('state_code')}:\n\n• {_row(card)}\n• {_row(other)}")
+            return _reply_turn(session, text, reply, fine_card=card, fine_cards=[card, other])
+
+    # Follow-up about the current answer ("is it compoundable?").
+    followup = _maybe_followup(session, text, eng, new_match=new_match)
+    if followup is not None:
+        return followup
+
+    # Several offences in one message → one combined, grounded answer.
+    multi = nlu.resolve_multi(text, session.get("road_bucket"), session.get("vehicle_fine_class"))
+    cats = {_get_vio_excl_category(c) for c in multi} - {None}
+    if len(cats) > 1:          # helmet + seatbelt etc. → contradiction, clarify below
+        multi = []
+    if multi and session.get("state_code"):
+        if not session.get("vehicle_segment"):
+            _set_vehicle(session, eng.detect_vehicle_segment(text)
+                         or next((nlu.vehicle_from_violation(c) for c in multi
+                                  if nlu.vehicle_from_violation(c)), None))
+        parts, cards, total = [], [], 0
+        for code in multi:
+            c = eng.quick_fine(code, session.get("state_code"), session.get("city_code"),
+                               session.get("vehicle_fine_class"))
+            if not c:
+                continue
+            cards.append(c)
+            total += c.get("fine_first") or 0
+            sec = f" (MV Act §{c['mv_section']})" if c.get("mv_section") else ""
+            comp = "compoundable" if c.get("compoundable") else "**not compoundable** — goes to court"
+            parts.append(f"• **{c['violation_name']}**{sec}: **{nlu._fmt(c.get('fine_first'))}** "
+                         f"first offence — {comp}.")
+        if len(cards) >= 2:
+            loc = session.get("city_name") or session.get("state_code")
+            reply = (f"You've described **{len(cards)} separate offences** in {loc}:\n\n"
+                     + "\n".join(parts)
+                     + f"\n\nTogether that's **{nlu._fmt(total)}** if both are first offences. "
+                       "Ask me about either one for details (e.g. 'is the licence one compoundable?').")
+            session["violation_code"] = cards[0]["violation_code"]
+            session["last_fine_card"] = cards[0]
+            session["stage"] = "answered"
+            session["card_history"] = (session.get("card_history") or []) + cards[1:]
+            session["last_user_story"] = text
+            return _reply_turn(session, text, reply, fine_card=cards[0],
+                               detail_table=_build_detail_table(cards[0]), fine_cards=cards)
+
+    # "I drive a car" — a vehicle on its own. (The calculator harvests
+    # vehicles as slot answers instead.)
+    seg = None if calculator else nlu.vehicle_statement(text)
+    if seg:
+        _set_vehicle(session, seg)
+        pending = session.get("violation_code")
+        if pending and not card and session.get("state_code"):
+            return _answer_violation(session, text, pending)
+        return _reply_turn(session, text,
+            f"Got it — {SEGMENT_LABEL.get(seg, seg)}. What happened, or which rule are you "
+            "worried about? (e.g. 'no helmet', 'jumped a signal', 'no insurance')")
+    return None
+
+
+def _history_reference(session: dict, text: str) -> Optional[dict]:
+    """'the licence one' / 'the helmet fine' → an offence discussed earlier
+    in this conversation whose name contains that word."""
+    m = re.search(r"\b(?:the|that)\s+([a-z]+)\s+(?:one|fine|offence|challan|case|thing|rule)\b",
+                  text or "", re.I)
+    if not m:
+        return None
+    word = m.group(1).lower()
+    word_alts = {word, {"license": "licence", "licence": "license"}.get(word, word)}
+    for c in reversed(session.get("card_history") or []):
+        name = (c.get("violation_name") or "").lower()
+        if any(re.search(rf"\b{re.escape(w)}", name) for w in word_alts):
+            return {"code": c["violation_code"], "name": c.get("violation_name"), "score": 99}
+    return None
+
+
+def _maybe_followup(session: dict, text: str, eng=None, *, new_match=None) -> Optional[dict]:
+    """Answer a short follow-up about the last fine card deterministically.
+
+    Skipped when there's no prior answer, during an incident thread, or when
+    the text clearly names a *different* violation (that's a new question)."""
+    from followups import followup_reply
+
+    card = session.get("last_fine_card")
+    if not card or session.get("conversation_mode") == "incident":
+        return None
+    reply = followup_reply(text, card)
+    if reply is None:
+        return None
+    m = new_match
+    if m is None:
+        import nlu
+        m = resolve_violation_from_text(
+            nlu.mask_followup_terms(text), session.get("road_bucket"),
+            session.get("vehicle_segment"), eng,
+        ).get("match")
+    if m is None:
+        m = _history_reference(session, text)
+    if m and m["code"] != card.get("violation_code"):
+        # "is the helmet one compoundable?" — a follow-up question about a
+        # DIFFERENT (usually earlier) offence: answer it about that one.
+        eng = eng or get_graph_engine()
+        other = eng.quick_fine(m["code"], session.get("state_code"), session.get("city_code"),
+                               session.get("vehicle_fine_class"))
+        other_reply = followup_reply(text, other) if other else None
+        if not other_reply:
+            return None
+        card, reply = other, other_reply
+        session["violation_code"] = card["violation_code"]
+        session["last_fine_card"] = card
+    session.setdefault("messages", []).append({"role": "user", "content": text})
+    session.setdefault("messages", []).append({"role": "assistant", "content": reply})
+    session["pending_slot"] = None
+    return {
+        "intent":       "narrate",
+        "reply":        reply,
+        "fine_card":    card,
+        "detail_table": _build_detail_table(card),
+        "chips":        None,
+        "explanation":  None,
+    }
+
+
 def extract_and_reply(
     session: dict,
     user_text: str,
@@ -1606,6 +1971,11 @@ def extract_and_reply(
             session["pending_slot"] = scoped["slot"]
         return scoped
 
+    # ── Deterministic understanding layer (nlu.py) ───────────────────────────
+    pre = _pre_route(session, text, eng)
+    if pre is not None:
+        return pre
+
     # ── Intent / incident / slot-answer routing ───────────────────────────────
     routed = _route_conversation(session, text)
     if routed is not None:
@@ -1628,15 +1998,21 @@ def extract_and_reply(
 
     combined_text = _recent_user_text(session, text, n=2)
 
-    # Infer vehicle from text when not set.
+    # Infer vehicle from text when not set — or from the rule itself when it
+    # only exists for one vehicle (helmet / pillion / triple riding → 2W).
+    # A new story that clearly names a different vehicle ("…on my car")
+    # replaces the remembered one.
+    if text and session.get("vehicle_segment"):
+        explicit = eng.explicit_vehicle_segment(text)
+        if explicit and explicit != session["vehicle_segment"]:
+            _set_vehicle(session, explicit)
     if not session.get("vehicle_segment") and text:
-        veh_matches = eng.match_vehicle(text)
-        if veh_matches:
-            seg = veh_matches[0].get("segment")
-            if seg in _ALLOWED_SEGMENTS:
-                session["vehicle_segment"]    = seg
-                session["vehicle_fine_class"] = SEGMENT_FINE_CLASS.get(seg)
-                session["vehicle_type"]       = SEGMENT_LABEL.get(seg, seg)
+        import nlu
+        seg = eng.detect_vehicle_segment(text)
+        if not seg and deterministic_match:
+            seg = nlu.vehicle_from_violation(deterministic_match["code"])
+        if seg in _ALLOWED_SEGMENTS:
+            _set_vehicle(session, seg)
 
     # ── Pre-LLM ambiguous vehicle (canned — no Ollama) ────────────────────────
     if not session.get("vehicle_segment"):
@@ -1701,10 +2077,29 @@ def extract_and_reply(
             return {**mcq, "fine_card": None,
                     "detail_table": None, "explanation": None}
 
-    # ── Zero relevant violations → topic router (don't guess or spam LLM) ─────
+    # ── Zero relevant violations ──────────────────────────────────────────────
+    # Not about traffic at all → polite out-of-scope (both engines; the LLM
+    # would only decline anyway, so don't spend tokens on it).
+    referential = bool(session.get("last_fine_card")) and bool(
+        re.search(r"\b(this|that|it|this one|the fine|the challan)\b", text, re.I)) and len(text.split()) <= 12
+    if (not deterministic_match and not candidates and text and not referential
+            and not is_traffic_related(vio_text) and not is_short_slot_answer(text)
+            and session.get("conversation_mode") != "incident"):
+        from clarification_engine import _OUT_OF_SCOPE_REPLY
+        if _STORY_START_RE.search(text):
+            # Someone starting to tell what happened — invite them to go on.
+            return _reply_turn(session, text,
+                "Go on — I'm listening. What happened next? Were you stopped by the police, "
+                "given a challan, or was there an accident?")
+        return _reply_turn(session, text, _OUT_OF_SCOPE_REPLY, scope="out_of_scope")
+
+    # Traffic-related but unmatched: the cloud LLM can reason about it; the
+    # rules engine offers the topic router (with a context-aware question).
+    use_llm = not session.get("_force_rules")
     if (
         not deterministic_match
         and not candidates
+        and not use_llm
         and not is_short_slot_answer(text)
         and (is_traffic_related(vio_text) or substantive_tokens(vio_text))
         and session.get("conversation_mode") != "incident"
@@ -1715,6 +2110,11 @@ def extract_and_reply(
                 {"role": "user", "content": text}
             )
         mcq = build_zero_match_clarification(session)
+        import nlu
+        if nlu.has_enforcement_context(text):
+            q = ("Got it. What did the officer say you did? Tick the closest area (or type it) "
+                 "and I'll find the exact rule:")
+            mcq = {**mcq, "question": q, "reply": q}
         session["pending_slot"] = "topic_router"
         session.setdefault("messages", []).append(
             {"role": "assistant", "content": mcq["question"]}
@@ -1729,7 +2129,43 @@ def extract_and_reply(
         match_method = "keyword"
         match_confidence = "high"
 
-    # ── Fast path: all slots filled deterministically → no LLM ────────────────
+    # ── Fast path: violation certain + location + vehicle → grounded answer ──
+    # The fine lookup doesn't depend on road type, so don't wait for it. The
+    # LLM (cloud mode) only adds a short fact-free lead; facts come from the
+    # graph. Saves ~2k tokens per turn on Groq's free tier.
+    if (known_violation
+            and session.get("state_code")
+            and session.get("vehicle_segment")):
+        lead = "" if session.get("_force_rules") else _llm_lead(session, text, known_violation)
+        if text and not is_short_slot_answer(text):
+            session["last_user_story"] = text
+        return _answer_violation(session, text, known_violation, lead=lead)
+
+    # Violation certain, vehicle unknown, but the fine is the same for every
+    # vehicle here → just answer.
+    if (known_violation and session.get("state_code")
+            and not session.get("vehicle_segment")
+            and not eng.fine_varies_by_vehicle(known_violation, session.get("state_code"),
+                                               session.get("city_code"))):
+        lead = "" if session.get("_force_rules") else _llm_lead(session, text, known_violation)
+        if text and not is_short_slot_answer(text):
+            session["last_user_story"] = text
+        return _answer_violation(session, text, known_violation, lead=lead)
+
+    # Violation certain but vehicle unknown → ask for the vehicle directly
+    # (no LLM guess — the LLM used to assume "car").
+    if (known_violation and session.get("state_code")
+            and not session.get("vehicle_segment")):
+        name = (eng.get_violation(known_violation) or {}).get("name", known_violation)
+        q = f"Got it — **{name}**. What vehicle were you on? The fine can differ by vehicle."
+        session["pending_slot"] = "vehicle_segment"
+        return _reply_turn(session, text, q, intent="ask_slot", slot="vehicle_segment",
+                           chips=[{"id": k, "label": v} for k, v in (
+                               ("two_wheeler", "Bike / Scooter"), ("four_wheeler", "Car / SUV"),
+                               ("three_wheeler", "Auto-rickshaw"), ("four_wheeler_plus", "Bus / Minibus"),
+                               ("heavy_vehicle", "Truck / LCV"))],
+                           allow_text=True)
+
     if (known_violation
             and session.get("state_code")
             and session.get("road_bucket")
@@ -1792,7 +2228,9 @@ def extract_and_reply(
             "Even one extra line helps me find the right rule."
         )
 
-    _apply_extracted_slots(session, parsed["slots"])
+    llm_used = not session.get("_force_rules")
+    _apply_extracted_slots(session, parsed["slots"],
+                           evidence=combined_text if llm_used else None)
 
     # Validate LLM violation_code against deterministic + subgraph allow-list.
     llm_vc = parsed["slots"].get("violation_code")
@@ -1821,8 +2259,8 @@ def extract_and_reply(
     elif deterministic_match:
         session["violation_code"] = deterministic_match["code"]
 
-    if override_note:
-        reply = override_note + "\n\n" + reply
+    # (override_note is kept for the explanation panel; prefixing it to the
+    #  reply read awkwardly — "I've matched this to X…" before every answer.)
 
     # ── Post-slot coherence (before fine_card) ────────────────────────────────
     _coh = _check_coherence(session)
@@ -1868,8 +2306,9 @@ def extract_and_reply(
             session["last_fine_card"]       = None
     else:
         fine_card = None
+        # Road type isn't an input to the fine lookup, so don't block the card
+        # on it — otherwise a typed location (no map pin) never gets a card.
         if (session.get("state_code")
-                and session.get("road_bucket")
                 and session.get("vehicle_segment")
                 and session.get("violation_code")):
             fine_card = eng.quick_fine(
@@ -1910,6 +2349,28 @@ def extract_and_reply(
                 session["last_fine_card"] = fine_card
                 session["stage"] = "answered"
 
+    # ── Grounding: the LLM never states facts on its own ─────────────────────
+    if llm_used:
+        import nlu
+        if fine_card:
+            # Keep the model's human touch, but every number / section /
+            # consequence comes from the graph template.
+            lead = nlu.sanitize_lead(reply)
+            grounded, _ = grounded_answer(session, session["violation_code"], lead=lead)
+            reply = grounded
+        else:
+            problems = nlu.llm_reply_problems(
+                reply, allowed_amounts=set(), allowed_sections=[], session=session)
+            if problems:
+                log.info("LLM reply had ungrounded facts (%s) — stripping", problems)
+                sents = re.split(r"(?<=[.!?])\s+", reply)
+                kept = [x for x in sents if not nlu.llm_reply_problems(
+                    x, allowed_amounts=set(), allowed_sections=[], session=session)]
+                reply = " ".join(kept).strip() or (
+                    "Could you tell me a bit more about what happened — what were you "
+                    "doing, and what did the officer say? I'll find the exact rule.")
+        parsed["clean_reply"] = reply
+
     # ── Proactive inquiry policy (legacy text append — superseded by MCQ) ───
     inquiry_parts: List[str] = []
     clean_reply_for_history = parsed["clean_reply"]
@@ -1933,8 +2394,10 @@ def extract_and_reply(
                 (deterministic_match or {}).get("name")
             ),
         )
-        # Attach driver-context checkbox MCQ (same UX as chip-driven path).
-        if not session.get("_driver_context_done"):
+        # Attach driver-context checkbox MCQ (same UX as chip-driven path) —
+        # offered once per conversation, not after every answer.
+        if not session.get("_driver_context_done") and not session.get("_driver_context_offered"):
+            session["_driver_context_offered"] = True
             followup = build_driver_context_clarification()
             reply = reply.rstrip() + "\n\n" + followup["question"]
             chips_payload = followup["chips"]

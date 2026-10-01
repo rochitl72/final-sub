@@ -26,7 +26,7 @@ FastAPI service: slot-filling dialog, graph lookups, optional Groq + Sarvam.
 ## Run
 
 ```bash
-cd drivelegal/backend
+cd final-sub/backend
 uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 ```
 

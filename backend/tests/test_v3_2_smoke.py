@@ -165,9 +165,10 @@ class DynamicNarrateFlow(unittest.TestCase):
         # Protocol lines were stripped from the user-facing reply.
         self.assertNotIn("<<SLOTS", narrate["reply"])
         self.assertNotIn("<<CHIPS", narrate["reply"])
-        # Slot extraction filled vehicle + violation; road bucket too.
+        # Slot extraction filled vehicle + violation. (Road type is no longer
+        # required: "no helmet on my bike" resolves deterministically, so the
+        # grounded fast path answers without an LLM round-trip.)
         s = narrate["session_state"]
-        self.assertEqual(s["road_bucket"],      "street")
         self.assertEqual(s["vehicle_segment"],  "two_wheeler")
         self.assertEqual(s["violation_code"],   "SAFETY_NO_HELMET_RIDER")
         self.assertEqual(s["vehicle_fine_class"], "2W")
@@ -345,7 +346,11 @@ class ViolationResolutionUnit(unittest.TestCase):
                 out["fine_card"]["violation_code"],
                 "SAFETY_NO_HELMET_RIDER",
             )
-        self.assertIn("matched this to", out["reply"].lower())
+        # The wrong LLM code is overridden; the answer is the grounded helmet
+        # rule (the old "I've matched this to…" reply prefix was removed).
+        self.assertIn("helmet", out["reply"].lower())
+        self.assertEqual((out.get("explanation") or {}).get("violation_matched"),
+                         "SAFETY_NO_HELMET_RIDER")
 
     def test_canned_ambiguous_vehicle_no_llm(self):
         from unittest.mock import patch
@@ -565,6 +570,9 @@ class ScopeAndMcqUnit(unittest.TestCase):
             "vehicle_segment": "four_wheeler",
             "narrate_started": True,
             "messages":        [],
+            # The topic router is the RULES engine's fallback; with a cloud LLM
+            # available, unmatched traffic stories go to the LLM instead.
+            "_force_rules":    True,
         }
         out = extract_and_reply(
             session,

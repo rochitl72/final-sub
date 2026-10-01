@@ -24,7 +24,7 @@ It runs across a **FastAPI backend**, an **Expo (React Native) mobile app**, and
 
 | Mode | How it works | Needs internet? |
 |------|--------------|-----------------|
-| ☁️ **Cloud AI** | Groq (Llama-3.1-8B) narrates over the graph; best language quality | Yes |
+| ☁️ **Cloud AI** | Groq (gpt-oss-20b by default, auto-selected) narrates over the graph; best language quality | Yes |
 | 📋 **Rules (Offline)** | Deterministic resolver + graph fine-cascade — instant, exact, 100% grounded | No |
 | 🔌 **On-device AI** | A real LLM (Llama-3.2-1B via **WebLLM / WebGPU**) running *in the browser*, offline, with on-device RAG over the graph | No (after first model download) |
 
@@ -110,7 +110,7 @@ docs/                    architecture notes, offline-AI guide
 
 ```bash
 cd backend
-python3 -m pip install fastapi "uvicorn[standard]" "python-jose[cryptography]" httpx pydantic beautifulsoup4
+python3 -m pip install -r backend/requirements.txt
 cp ../.env.example ../.env      # then add your keys (see below)
 python3 api.py                 # serves on http://0.0.0.0:8000
 ```
@@ -158,6 +158,15 @@ and bundled for the client (`apps/mobile/src/offline/`, `apps/web/offline.bundle
 The service worker precaches the app shell, the offline engine, and the WebLLM loader;
 WebLLM caches the model weights in the browser. Result: after one online visit, the
 whole experience — including a running LLM — works with the network off.
+
+## Tested conversation quality
+
+Every combination of **Chatbot / Calculator × Rules / Groq** is evaluated end-to-end with
+135 scripted conversations (follow-ups, memory, what-ifs, multiple offences, Hinglish,
+typos, off-topic, unsafe requests, accidents, novel questions) — all pass, with every ₹
+amount and MV Act section grounded in the knowledge graph. See
+[docs/CONVERSATION_EVAL.md](docs/CONVERSATION_EVAL.md) and run
+`python3 scripts/eval_conversations.py`.
 
 ## License & credits
 

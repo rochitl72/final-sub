@@ -12,8 +12,8 @@
  */
 
 const TILE_CACHE  = "drivelegal-tiles-v1";
-const SHELL_CACHE = "drivelegal-shell-v10";  // bumped: model over-refusal guard + educational prompt
-const API_CACHE   = "drivelegal-api-v3";
+const SHELL_CACHE = "drivelegal-shell-v11";  // bumped: offline guardrail + follow-ups, deduped cities
+const API_CACHE   = "drivelegal-api-v4";  // bumped: deduped city catalog
 const TILE_HOSTS  = [
   "tile.openstreetmap.org",
   "a.tile.openstreetmap.org",

@@ -74,7 +74,9 @@ _GENERIC_TOKENS = {
 _TRAFFIC_SIGNAL_RE = re.compile(
     r"\b("
     r"drive|driving|driver|road|traffic|challan|chalan|fine|penalty|"
-    r"police|cop|rto|parivahan|vehicle|car|bike|scooter|truck|bus|"
+    r"police|cop|rto|parivahan|vehicle|car|bike|scooter|scooty|truck|bus|lorry|"
+    r"auto|taxi|cab|tractor|ev|honk\w*|horn|meter|headlights?|lights?|airbags?|toll|"
+    r"fastag|number\s*plate|overtak\w*|lane|u[-\s]?turn|silencer|tint\w*|"
     r"helmet|seatbelt|seat\s+belt|signal|red\s+light|speed|overtake|"
     r"park|parking|licen[cs]e|insurance|puc|pollution|rc\b|registration|"
     r"accident|crash|collision|hit|knock|pedestrian|"
@@ -89,7 +91,9 @@ _OUT_OF_SCOPE_RE = re.compile(
     r"\b("
     # Weather / sports / entertainment
     r"weather\s+forecast|today'?s?\s+weather|tomorrow'?s?\s+weather|"
-    r"cricket\s+score|ipl\s+match|football\s+score|world\s+cup\s+score|"
+    r"(?:what'?s|whats|what\s+is|how'?s|how\s+is)\s+the\s+weather|"
+    r"cricket\s+(score|match)|ipl\s+(match|score)|football\s+(score|match)|world\s+cup\s+score|"
+    r"who\s+won\s+the\s+(match|game|election)|"
     r"movie\s+review|bollywood|netflix|hotstar|prime\s+video|"
     r"song\s+lyrics|spotify|recommend\s+a\s+movie|"
     # Food / lifestyle / shopping
@@ -149,8 +153,16 @@ _OUT_OF_SCOPE_REPLY = (
     "or traffic question, describe it in plain words and I'll help."
 )
 
+# Only explicit age statements count — "I'm 17", "17 years old", "he is 16",
+# "age 19". A bare number is accepted only when it's the whole message (a
+# reply to an age question). Previously ANY 1–2 digit number was an age
+# ("what is 25 times 4" → age 25; "going 80 in a 50 zone" → age 80).
 _AGE_RE = re.compile(
-    r"(?:^|\b)(?:i(?:'m|\s+am)?\s+)?(\d{1,2})(?:\s+years?\s+old)?(?:\s|$|\.)",
+    r"\b(?:(?:i|he|she|they|son|daughter|kid|child|rider|driver)\s*(?:'m|'s|\s+am|\s+is|\s+was|\s+were)\s+"
+    r"(?:only\s+|just\s+)?(\d{1,2})(?!\s*(?:km|kmph|kms|%|rs|₹|times|mins?|minutes|hours?|am\b|pm\b))\b"
+    r"|(\d{1,2})\s*(?:-|\s)?\s*(?:years?|yrs?)(?:\s*-?\s*old)?\b"
+    r"|\bage(?:d)?\s*(?:is\s*)?(\d{1,2})\b"
+    r"|^\s*(?:i\s*)?(?:am|im|i'm)\s+(?:only\s+|just\s+)?(\d{1,2})\b)",
     re.I,
 )
 _DENIAL_RE = re.compile(
@@ -159,6 +171,25 @@ _DENIAL_RE = re.compile(
     r"accident)\b",
     re.I,
 )
+# Someone ELSE hit the user ("the other guy hit my car and fled") — the user
+# is the victim: accident procedure, not a fine for them.
+_VICTIM_RE = re.compile(
+    r"\b(?:other|another|a|some|the|this)\s+(?:guy|man|woman|driver|car|bike|vehicle|person|truck|"
+    r"auto|bus|lorry|scooter|biker)\b[^.]{0,40}?\b(?:hit|rammed|crashed\s+into|knocked(?:\s+down)?|"
+    r"dashed|banged\s+into)\s+(?:me|my|into\s+my|into\s+me)\b|\bhit\s+me\s+and\s+(?:ran|fled|left)\b",
+    re.I,
+)
+_FLED_RE = re.compile(r"\b(fled|ran\s+away|ran\s+off|drove\s+off|sped\s+off|didn'?t\s+stop|escaped|hit\s+and\s+run)\b", re.I)
+
+
+def is_victim_report(text: str) -> bool:
+    return bool(_VICTIM_RE.search(text or ""))
+
+
+def victim_fled(text: str) -> bool:
+    return bool(_FLED_RE.search(text or ""))
+
+
 _INCIDENT_RE = re.compile(
     r"\b(hit|knocked|ran\s+over|collid|crash|accident)\b.*\b(cow|animal|dog|"
     r"pedestrian|cyclist|person|wildlife|stray)\b|\b(cow|animal|dog)\b.*\b("
@@ -179,12 +210,12 @@ def parse_age(text: str) -> Optional[int]:
     m = _AGE_RE.search(text.strip())
     if not m:
         # Bare number reply to an age question.
-        bare = text.strip()
+        bare = text.strip().rstrip(".!")
         if bare.isdigit() and 1 <= int(bare) <= 99:
             return int(bare)
         return None
-    age = int(m.group(1))
-    return age if 1 <= age <= 99 else None
+    age = int(next(g for g in m.groups() if g))
+    return age if 5 <= age <= 99 else None
 
 
 def is_short_slot_answer(text: str) -> bool:
@@ -202,7 +233,7 @@ def is_violation_denial(text: str) -> bool:
 
 
 def looks_like_incident(text: str) -> bool:
-    return bool(_INCIDENT_RE.search(text or ""))
+    return bool(_INCIDENT_RE.search(text or "")) or is_victim_report(text)
 
 
 def is_traffic_related(text: str) -> bool:

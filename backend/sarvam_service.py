@@ -61,7 +61,7 @@ def _bearer_hdrs() -> dict:
 def _require_api_key() -> None:
     if not _api_key():
         raise SarvamOfflineError(
-            "SARVAM_API_KEY not set — add it to drivelegal/.env and restart"
+            "SARVAM_API_KEY not set — add it to .env in the repo root and restart"
         )
 
 

@@ -115,7 +115,7 @@ _ASK_STATE = (
 )
 
 _ASK_VEHICLE = (
-    "Got it! One more thing — **what type of vehicle** were you on? "
+    "One more thing — **what type of vehicle** were you on? "
     "Bike/scooter, car, auto, or something else? The fine can differ by vehicle class."
 )
 
@@ -197,13 +197,20 @@ def _build_fine_response(session: dict, vio_code: str) -> str:
     name     = vio.get("name") or vio_code
     sec      = vio.get("mv_section")
     compound = vio.get("compoundable", False)
-    tips     = vio.get("tips_to_avoid") or ""
-    what_do  = vio.get("what_to_do_next") or ""
-    conseq   = vio.get("dl_consequence") or vio.get("consequence") or ""
-    misc     = vio.get("common_misconception") or ""
+    # Use the card's advice text: quick_fine has already dropped clauses that
+    # quote amounts contradicting this location's fine.
+    from graph_engine import card_amounts, ground_amounts
+    allowed  = card_amounts(card) if card else set()
+    src_txt  = card or vio
+    tips     = src_txt.get("tips_to_avoid") or ""
+    what_do  = src_txt.get("what_to_do_next") or ""
+    conseq   = (card.get("licence_consequence") if card
+                else (vio.get("dl_consequence") or vio.get("consequence"))) or ""
+    misc     = ground_amounts(vio.get("common_misconception") or "", allowed) if card \
+               else (vio.get("common_misconception") or "")
     grp      = (vio.get("grp") or "").replace("_", " ").title()
     loc      = _loc_str(session)
-    veh      = session.get("vehicle_type") or "your vehicle"
+    veh      = session.get("vehicle_type")
 
     parts: List[str] = []
 
@@ -218,16 +225,20 @@ def _build_fine_response(session: dict, vio_code: str) -> str:
         first_str  = _fmt_fine(card["fine_first"])
         repeat_str = _fmt_fine(card.get("fine_repeat")) if card.get("fine_repeat") else None
 
+        veh_str = f" ({veh})" if veh else ""
         lead = (
-            f"For **{name}**{sec_str} in **{loc}** ({veh}), "
+            f"For **{name}**{sec_str} in **{loc}**{veh_str}, "
             f"the first-offence fine is **{first_str}**{src_note}."
         )
         if repeat_str:
-            lead += f" Repeat offence: **{repeat_str}**."
+            lead += f" Repeat offence: **{repeat_str}**"
+            if card.get("fine_repeat_source") and card["fine_repeat_source"] != card.get("fine_source"):
+                lead += f" ({card['fine_repeat_source']} schedule)"
+            lead += "."
     else:
         lead = (
             f"**{name}**{sec_str} is an offence under the Motor Vehicles Act. "
-            f"I couldn't pinpoint the exact amount for {loc}/{veh} — the central "
+            f"I couldn't pinpoint the exact amount for {loc}{'/' + veh if veh else ''} — the central "
             f"MV Act schedule applies."
         )
     parts.append(lead)
@@ -235,7 +246,9 @@ def _build_fine_response(session: dict, vio_code: str) -> str:
     # ── Imprisonment / compoundable ────────────────────────────────────────────
     details: List[str] = []
     if card and card.get("imprisonment"):
-        details.append(f"Imprisonment: up to {card['imprisonment']}.")
+        imp = str(card["imprisonment"]).strip().rstrip(".")
+        prefix = "up to " if imp[:1].isdigit() else ""
+        details.append(f"Imprisonment: {prefix}{imp}.")
     compound_note = (
         "✅ Compoundable — can be paid on-the-spot to the officer."
         if compound else
@@ -331,7 +344,7 @@ def _speed_limit_response(session: dict) -> str:
     if speeds:
         lines = [f"  • **{name}**: {spd} km/h" for name, spd in speeds.items()]
         return (
-            f"Speed limits for **{bucket.replace('_',' ')} roads** near {loc} "
+            f"Speed limits for **{ {'highway': 'highways', 'main_road': 'main roads', 'street': 'city streets'}.get(bucket, bucket.replace('_', ' ') + ' roads') }** near {loc} "
             f"(for {veh}):\n" + "\n".join(lines)
             + "\n\nNote: school zones and residential areas may have lower local limits. "
             "Speed cameras (ANPR) are active on most expressways — violations are auto-challaned."
@@ -490,7 +503,7 @@ def narrate_protocol(
 
         if not session.get("vehicle_segment"):
             reply = (
-                f"Got the violation — "
+                f"I've found the rule for that. "
                 + _ASK_VEHICLE
             )
             return _with_slots(reply, session, vio_code=vio_code, needs="vehicle_segment")

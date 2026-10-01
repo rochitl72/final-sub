@@ -21,7 +21,7 @@ Step-by-step instructions for **new contributors** cloning this repo and testing
 ## Repository layout (after reorganisation)
 
 ```
-drivelegal/
+final-sub/
 ├── README.md                 # Project overview
 ├── SETUP.md                  # This file
 ├── start.sh                  # One command: backend + Expo (macOS/Linux)
@@ -36,8 +36,6 @@ drivelegal/
 ├── config/
 │   └── .env.example
 ├── docs/
-│   └── assets/
-│       └── setup-terminal-qr.jpeg  # Example Metro QR screen
 └── scripts/
     ├── verify.sh             # Run tests without starting servers
     └── setup-ollama.sh       # Legacy Ollama-only launcher (optional)
@@ -108,16 +106,15 @@ node --version
 **macOS / Linux**
 
 ```bash
-cd drivelegal
-pip3 install fastapi uvicorn httpx requests beautifulsoup4 \
-  "python-jose[cryptography]" python-multipart python-dotenv
+cd final-sub
+python3 -m pip install -r backend/requirements.txt
 ```
 
 **Windows**
 
 ```powershell
-cd drivelegal
-pip install fastapi uvicorn httpx requests beautifulsoup4 python-jose[cryptography] python-multipart python-dotenv
+cd final-sub
+python -m pip install -r backend\requirements.txt
 ```
 
 Verify the graph file exists:
@@ -148,7 +145,7 @@ notepad .env
 
 | Variable | Used for | Demo note |
 |----------|----------|-----------|
-| `GROQ_CHAT_API_KEY` | Cloud AI narrate (Llama 3.1 8B) | **Free tier** — used in this demo |
+| `GROQ_CHAT_API_KEY` | Cloud AI narrate (gpt-oss-20b by default; override with `GROQ_CHAT_MODEL`) | **Free tier** — used in this demo |
 | `SARVAM_API_KEY` | Hindi/Tamil TTS + translation | Strongly recommended for voice |
 | `GROQ_API_KEY` | Gov.in patch scraper only | Optional |
 
@@ -158,7 +155,7 @@ Without keys: **rules-only mode** still works (graph + `offline_engine`).
 
 ## 5. Start everything (recommended — macOS / Linux)
 
-From `drivelegal/`:
+From the repo root (`final-sub/`):
 
 ```bash
 bash start.sh
@@ -172,11 +169,7 @@ This script:
 4. Starts FastAPI on **port 8000**
 5. Starts **Expo Metro** and prints a **QR code**
 
-### Example terminal (QR code)
-
-When Metro is ready, you should see a screen like this:
-
-![Expo QR code in terminal](docs/assets/setup-terminal-qr.jpeg)
+When Metro is ready it prints a QR code in the terminal:
 
 - **Metro URL:** `exp://<YOUR_LAN_IP>:8081`
 - **Backend URL:** `http://<YOUR_LAN_IP>:8000`
@@ -192,7 +185,7 @@ Use **two terminals**.
 **macOS / Linux**
 
 ```bash
-cd drivelegal
+cd final-sub
 set -a && source .env && set +a   # skip if no .env yet
 cd backend
 uvicorn api:app --host 0.0.0.0 --port 8000 --reload
@@ -201,7 +194,7 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 **Windows PowerShell**
 
 ```powershell
-cd drivelegal\backend
+cd final-sub\backend
 $env:PYTHONPATH = "."
 # Load .env manually or set keys:
 # $env:GROQ_CHAT_API_KEY = "gsk_..."
@@ -231,7 +224,7 @@ echo EXPO_PUBLIC_API_BASE_URL=http://192.168.1.42:8000 > apps/mobile/.env
 **macOS / Linux**
 
 ```bash
-cd drivelegal/apps/mobile
+cd final-sub/apps/mobile
 npm ci --legacy-peer-deps
 npx expo install --fix
 npx expo start --lan
@@ -240,7 +233,7 @@ npx expo start --lan
 **Windows**
 
 ```powershell
-cd drivelegal\apps\mobile
+cd final-sub\apps\mobile
 npm ci --legacy-peer-deps
 npx expo install --fix
 npx expo start --lan
@@ -294,7 +287,7 @@ Then restart Expo.
 ## 9. Run automated checks (no phone)
 
 ```bash
-cd drivelegal
+cd final-sub
 bash scripts/verify.sh
 ```
 

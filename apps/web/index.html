@@ -2730,16 +2730,16 @@ async function checkHealth() {
   try {
     const h = await fetch(API + '/api/health').then(r => r.json());
     serverOnline = true;
-    if (h.ready) {
-      badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>${h.model || 'ready'}`;
-      badge.className = 'ready';
-    } else if (h.ollama_ok) {
-      badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>model not pulled`;
-      badge.className = 'error';
-    } else {
-      badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>Ollama offline`;
-      badge.className = 'error';
-    }
+    // Cloud AI when Groq is reachable; otherwise the server's deterministic
+    // rules engine still answers every question (graph-grounded, no LLM).
+    const label = h.groq_ok ? `Cloud AI · ${h.model || 'Groq'}`
+                : h.ready   ? 'Rules (offline engine)'
+                :             'Server starting…';
+    badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>${label}`;
+    badge.className = (h.groq_ok || h.ready) ? 'ready' : 'error';
+    badge.title = h.groq_ok
+      ? 'Groq cloud model narrates; fines come from the knowledge graph.'
+      : 'No cloud AI key configured or reachable — answers come from the rule engine.';
   } catch {
     serverOnline = false;
     // On-device engine still answers, so surface that instead of a dead end.

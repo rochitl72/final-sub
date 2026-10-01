@@ -145,6 +145,50 @@ def _norm(text: str) -> str:
     return text
 
 
+# "₹1,000" and ranges like "₹1,000–5,000" (both ends are checked).
+_RUPEE_RE = re.compile(r"(?:₹|rs\.?\s?|inr\s?)\s?(\d[\d,]*)(?:\s*[–-]\s*(?:₹\s?)?(\d[\d,]*))?", re.I)
+
+
+def _rupee_amounts(text: str) -> set:
+    out = set()
+    for a, b in _RUPEE_RE.findall(text or ""):
+        for x in (a, b):
+            d = x.replace(",", "")
+            if d.isdigit():
+                out.add(int(d))
+    return out
+
+
+def card_amounts(card: dict) -> set:
+    """Every rupee amount a fine card legitimately carries."""
+    return {int(v) for k in ("fine_first", "fine_repeat", "patch_fine_first", "patch_fine_repeat")
+            if isinstance((v := card.get(k)), (int, float)) and v}
+
+
+def ground_amounts(text: str, allowed: set) -> str:
+    """Remove clauses of *text* that quote a ₹ amount not in *allowed*.
+
+    Splits on sentence / clause boundaries (. ; —) and keeps clauses with no
+    amounts or only allowed ones. Returns "" if nothing grounded remains.
+    Kept in sync with apps/mobile/src/offline/graph.ts (groundAmounts).
+    """
+    if not text or not _RUPEE_RE.search(text):
+        return text
+    # Clauses end at "." / ";" (followed by space or end) or an em/en dash.
+    clauses = re.findall(r".+?(?:[.;](?=\s|$)|\s[—–]\s|$)", text.strip())
+    kept = []
+    for cl in clauses:
+        amts = _rupee_amounts(cl)
+        if amts and not amts <= allowed:
+            continue
+        kept.append(cl.strip())
+    out = " ".join(k for k in kept if k).strip()
+    out = re.sub(r"\s*[;—–]\s*$", ".", out)          # no dangling separator
+    if out and out[-1] not in ".!?)":
+        out += "."
+    return out
+
+
 class GraphEngine:
     """
     Loads graph JSON once (~1.2 MB) and provides <3 ms traversal queries.
@@ -257,8 +301,9 @@ class GraphEngine:
             extras.extend(node.get("keywords") or [])
             if node.get("name"):
                 extras.append(node["name"])
-            if node.get("common_misconception"):
-                extras.append(node["common_misconception"])
+            # (common_misconception is NOT indexed: it describes other situations
+            #  — "even at a red signal phone use counts" made "red signal" score
+            #  for phone use.)
             for raw in extras:
                 key = _norm(raw)
                 if not key:
@@ -440,27 +485,90 @@ class GraphEngine:
                     return n
             return self.nodes.get(nids[0])
 
+        levels = []
         if city_code:
-            r = _pick(fbi.get("city",{}).get(city_code,[]), vehicle_class)
-            if r: return {**r, "fine_source": "city"}
-
+            levels.append(("city", _pick(fbi.get("city", {}).get(city_code, []), vehicle_class)))
         if state_code:
-            r = _pick(fbi.get("state",{}).get(state_code,[]), vehicle_class)
-            if r: return {**r, "fine_source": "state"}
+            levels.append(("state", _pick(fbi.get("state", {}).get(state_code, []), vehicle_class)))
+        levels.append(("central", _pick(fbi.get("central", []), vehicle_class)))
+        levels = [(src, n) for src, n in levels if n]
+        if not levels:
+            return None
 
-        r = _pick(fbi.get("central",[]), vehicle_class)
-        if r: return {**r, "fine_source": "central"}
-        return None
+        src, node = levels[0]
+        out = {**node, "fine_source": src}
+        # A city/state schedule often only restates the first-offence amount.
+        # Fill repeat / imprisonment from the next broader schedule so users
+        # don't see "Repeat: varies" when the MV Act does specify it.
+        for field in ("repeat_offence", "imprisonment"):
+            if out.get(field) in (None, "", 0):
+                for broader_src, broader in levels[1:]:
+                    if broader.get(field) not in (None, "", 0):
+                        out[field] = broader[field]
+                        out[f"{field}_source"] = broader_src
+                        break
+        return out
+
+    def fine_varies_by_vehicle(self, violation_code: str,
+                               state_code: Optional[str] = None,
+                               city_code: Optional[str] = None) -> bool:
+        """True when the applicable fine schedule has vehicle-specific rows —
+        only then is it worth asking the user for their vehicle."""
+        fbi = self.indexes["fine_by_violation"].get(violation_code) or {}
+        nids = list(fbi.get("central", []))
+        if state_code:
+            nids += fbi.get("state", {}).get(state_code, [])
+        if city_code:
+            nids += fbi.get("city", {}).get(city_code, [])
+        classes = {self.nodes.get(n, {}).get("vehicle_class") for n in nids}
+        classes.discard(None)
+        return len(classes) > 0
 
     # ── Vehicle matching ──────────────────────────────────────────────────────
+
+    def explicit_vehicle_segment(self, text: str) -> Optional[str]:
+        """Like detect_vehicle_segment, but only for a clearly owned / ridden
+        vehicle ("on my car", "driving a truck") — strong enough to override
+        a vehicle remembered from earlier in the conversation."""
+        return self.detect_vehicle_segment(text, min_score=3)
+
+    def detect_vehicle_segment(self, text: str, min_score: int = 1) -> Optional[str]:
+        """Best guess of the USER's vehicle segment from free text, or None.
+
+        Word-boundary matching (so "card" ≠ car, "business" ≠ bus), ignores
+        vehicles that are clearly someone else's or a place ("give way to an
+        ambulance", "bus stop"), and prefers possessive / riding mentions
+        ("on my bike", "driving a car") over incidental ones ("a car hit me").
+        """
+        t = f" {text.lower()} "
+        best = None
+        for kw, segment in VEHICLE_KEYWORDS.items():
+            if segment == "emergency":
+                continue
+            for m in re.finditer(rf"(?<![a-z0-9]){re.escape(kw)}s?(?![a-z0-9])", t):
+                after = t[m.end():m.end() + 12]
+                if kw == "bus" and re.match(r"\s*(stop|stand|lane|depot|bay)", after):
+                    continue
+                before = t[max(0, m.start() - 24):m.start()]
+                score = 1
+                if re.search(r"\b(my|our|on\s+(a|my|the)|in\s+(a|my|the)|riding|driving|drove|"
+                             r"rode|was\s+on|by|his|her)\s+(own\s+)?$", before):
+                    score = 3
+                if re.search(r"\b(hit|by|another|other|a)\s+$", before) and "my" not in before[-6:]:
+                    score = min(score, 2) if score == 3 else 1
+                key = (score, -m.start())
+                if best is None or key > best[0]:
+                    best = (key, segment)
+        return best[1] if best and best[0][0] >= min_score else None
 
     def match_vehicle(self, text: str) -> list:
         """Match free text → vehicle nodes."""
         text_l = text.lower().strip()
-        for kw, segment in VEHICLE_KEYWORDS.items():
-            if kw in text_l:
-                results = [n for nid, n in self.nodes.items()
-                           if n.get("type") == "vehicle" and n.get("segment") == segment]
+        segment = self.detect_vehicle_segment(text_l)
+        if segment:
+            results = [n for nid, n in self.nodes.items()
+                       if n.get("type") == "vehicle" and n.get("segment") == segment]
+            if results:
                 return results[:5]
         # Fuzzy: check vehicle names
         results = []
@@ -644,6 +752,9 @@ class GraphEngine:
                                      or vio.get("consequence"))  if vio else None,
             "fine_first":           fine.get("first_offence"),
             "fine_repeat":          fine.get("repeat_offence"),
+            # Set when the repeat amount came from a broader schedule
+            # (e.g. city lists only the first offence → central MV Act repeat).
+            "fine_repeat_source":   fine.get("repeat_offence_source"),
             "imprisonment":         fine.get("imprisonment"),
             "fine_source":          fine.get("fine_source", "central"),
             "state_code":           fine.get("state_code"),
@@ -688,4 +799,11 @@ class GraphEngine:
         except Exception:
             pass   # Patch engine unavailable — silently fall back to base data
 
+        # Advice text in the graph quotes central-schedule amounts; next to a
+        # city/state fine that reads as a contradiction ("Pay ₹5,000" under a
+        # ₹1,000 card). Drop any clause quoting an amount the card doesn't carry.
+        allowed = card_amounts(card)
+        for key in ("what_to_do_next", "tips_to_avoid", "licence_consequence"):
+            if card.get(key):
+                card[key] = ground_amounts(card[key], allowed)
         return card

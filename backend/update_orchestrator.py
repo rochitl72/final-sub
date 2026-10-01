@@ -4,11 +4,11 @@ update_orchestrator.py — Scrape → Groq extract → Patch store
 =============================================================
 Coordinates the full update cycle:
   1. Fetch each gov.in source (skip if unchanged via SHA-256)
-  2. Send changed text to Groq (llama-3.1-8b-instant) for structured extraction
+  2. Send changed text to Groq (auto-selected chat model) for structured extraction
   3. Validate & store patches — ADDITIVE ONLY, base graph never touched
 
 Groq budget management (free tier limits):
-  Model  : llama-3.1-8b-instant
+  Model  : same auto-selected Groq model as the chat path
   RPM    : 30  → we use 1 call per 3.5s  (≈17 RPM, safe headroom)
   TPM    : 6,000 → we cap each call at ≤2,000 tokens in + ≤600 out
   RPD    : 14,400 → one full cycle ≈ 28 calls, well within daily budget
@@ -38,8 +38,22 @@ log = logging.getLogger("drivelegal.updater")
 
 # ── Groq config ───────────────────────────────────────────────────────────────
 
-GROQ_MODEL     = "llama-3.1-8b-instant"
 GROQ_ENDPOINT  = "https://api.groq.com/openai/v1/chat/completions"
+
+# Same model selection as the chat path (llama-3.1-8b-instant was retired).
+from llm_chatbot import _model_params, GROQ_MODEL_PREFERENCE, _available_models  # noqa: E402
+
+_scraper_model_cache: Optional[str] = None
+
+
+def _scraper_model(key: str) -> str:
+    global _scraper_model_cache
+    if _scraper_model_cache is None:
+        wanted = os.environ.get("GROQ_CHAT_MODEL", "").strip()
+        prefs  = ([wanted] if wanted else []) + GROQ_MODEL_PREFERENCE
+        avail  = _available_models(key) or []
+        _scraper_model_cache = next((m for m in prefs if m in avail), prefs[0])
+    return _scraper_model_cache
 
 
 def _groq_key() -> str:
@@ -119,13 +133,13 @@ def _call_groq(
                 "Content-Type":  "application/json",
             },
             json={
-                "model":       GROQ_MODEL,
+                "model":       _scraper_model(key),
                 "messages":    [
                     {"role": "system", "content": _SYSTEM},
                     {"role": "user",   "content": user_msg},
                 ],
                 "temperature": 0.05,   # near-deterministic extraction
-                "max_tokens":  600,
+                **_model_params(_scraper_model(key), 600),
             },
             timeout=25.0,
         )

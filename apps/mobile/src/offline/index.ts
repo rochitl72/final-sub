@@ -7,7 +7,7 @@
  */
 
 import type { SessionState, TurnResponse } from '../services/api';
-import { narrate, OfflineResult, OfflineSession } from './offlineEngine';
+import { isUnsafeRequest, narrate, OfflineResult, OfflineSession, SEGMENT_FINE_CLASS } from './offlineEngine';
 import { narrateWithSLM } from './slm';
 
 export { narrate } from './offlineEngine';
@@ -24,9 +24,8 @@ function toOffline(s: SessionState | null): OfflineSession {
     city_name: s.city_name,
     road_bucket: s.road_bucket,
     vehicle_segment: s.vehicle_segment,
-    // Mobile SessionState carries segment but not the fine-class/label — the
-    // cascade safely falls back to the non-vehicle-specific fine when null.
-    vehicle_fine_class: null,
+    // Derive the fine class from the segment so vehicle-specific fines apply.
+    vehicle_fine_class: s.vehicle_segment ? (SEGMENT_FINE_CLASS[s.vehicle_segment] ?? null) : null,
     violation_code: s.violation_code,
   };
 }
@@ -45,12 +44,16 @@ export async function localTurn(
   const offlineSession = toOffline(state);
   // Tier 2: on-device neural model (if a runtime is registered). Falls back to
   // Tier 3 deterministic engine otherwise. Fine amounts stay graph-exact.
-  const r: OfflineResult =
-    (await narrateWithSLM(offlineSession, text)) ?? narrate(offlineSession, text);
+  // Safety-guardrail requests never reach the generative model.
+  const r: OfflineResult = isUnsafeRequest(text)
+    ? narrate(offlineSession, text)
+    : (await narrateWithSLM(offlineSession, text)) ?? narrate(offlineSession, text);
 
   const nextState: SessionState = {
     ...(state as SessionState),
     violation_code: r.violationCode ?? state?.violation_code ?? null,
+    // Vehicle inferred on-device ("on my scooter", helmet → two-wheeler).
+    vehicle_segment: offlineSession.vehicle_segment ?? state?.vehicle_segment ?? null,
   } as SessionState;
 
   return {

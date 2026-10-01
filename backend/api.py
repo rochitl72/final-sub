@@ -39,7 +39,7 @@ _HERE = Path(__file__).parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-# Load drivelegal/.env so uvicorn always sees API keys (even without start.sh)
+# Load the repo-root .env so uvicorn always sees API keys (even without start.sh)
 _ENV_FILE = _HERE.parent / ".env"
 if _ENV_FILE.exists():
     try:
@@ -72,7 +72,7 @@ from dynamic_chatbot import (
     handle as dynamic_handle,
 )
 from graph_engine    import get_graph_engine
-from llm_chatbot     import handle_freeform, warmup, check_groq_status
+from llm_chatbot     import handle_freeform, warmup, check_groq_status, groq_model_name
 from persistence     import derive_title, get_chat_store
 from auth            import (
     router as auth_router,
@@ -218,7 +218,7 @@ async def _startup() -> None:
     threading.Thread(target=warmup, name="groq-warmup", daemon=True).start()
     # Background cloud-status checker — keeps health endpoint instant (<1ms)
     threading.Thread(target=_cloud_status_checker, name="cloud-status", daemon=True).start()
-    log.info("DriveLegal backend ready (Groq online + offline_engine fallback)")
+    log.info("DriveLegal backend ready (cloud LLM when configured; offline rules engine always on)")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -275,7 +275,21 @@ def _get_session_or_404(sid: str) -> dict:
     raise HTTPException(status_code=404, detail=f"Unknown session_id: {sid}")
 
 
+def _remember_cards(s: dict, payload: dict) -> None:
+    """Per-conversation history of fines discussed (one entry per offence,
+    latest location wins) — powers "recap" / "total" answers."""
+    cards = payload.get("fine_cards") or ([payload["fine_card"]] if payload.get("fine_card") else [])
+    if not cards:
+        return
+    hist = [c for c in (s.get("card_history") or []) if isinstance(c, dict)]
+    for c in cards:
+        hist = [h for h in hist if h.get("violation_code") != c.get("violation_code")]
+        hist.append(c)
+    s["card_history"] = hist[-10:]
+
+
 def _envelope(s: dict, payload: dict) -> dict:
+    _remember_cards(s, payload)
     out = dict(payload)
     out.setdefault("session_state", session_state(s))
     out["session_id"] = s["session_id"]
@@ -376,7 +390,7 @@ async def health():
         "status":         "ok",
         "groq_ok":        groq_ok,
         "sarvam_ok":      sarvam_ok,
-        "model":          "sarvam-m / llama-3.1-8b-instant",
+        "model":          groq_model_name() if groq_ok else "offline rules engine",
         "ready":          True,          # offline engine always available
         "cloud_age_sec":  age,           # seconds since last cloud check
         # Legacy compat fields
