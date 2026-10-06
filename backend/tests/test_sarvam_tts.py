@@ -38,7 +38,12 @@ class SarvamTTSUnit(unittest.TestCase):
             self.skipTest("SARVAM_API_KEY not set")
         from sarvam_service import synthesize_speech
 
-        audio = synthesize_speech("नमस्ते", "hi-IN")
+        try:
+            audio = synthesize_speech("नमस्ते", "hi-IN")
+        except Exception as e:  # SarvamOfflineError
+            if "credits" in str(e):
+                self.skipTest("Sarvam key has no credits left")
+            raise
         self.assertGreater(len(audio), 1000)
 
 

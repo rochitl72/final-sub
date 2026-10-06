@@ -1345,6 +1345,25 @@ button, input, textarea {
   #sidebar-scrim.show { display: block; }
   #map-panel { flex-basis: 38%; }
 }
+
+/* ── Scenario cards (per-person breakdown) ───────────────────────────── */
+.sc-wrap{display:flex;flex-direction:column;gap:10px;margin-top:8px;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.sc-card{box-sizing:border-box;min-width:0;width:100%;background:var(--s3);border:var(--border-subtle);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-soft)}
+.sc-card.victim{opacity:.85;border-style:dashed}
+.sc-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.sc-name{font-weight:700;color:var(--t1)}
+.sc-meta{color:var(--t2);font-size:12px}
+.sc-total{font-weight:700;color:var(--accent-bright);font-size:13px;white-space:nowrap}
+.sc-off{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.07)}
+.sc-off:first-of-type{border-top:0}
+.sc-off>div:first-child{min-width:0;overflow-wrap:anywhere}
+.sc-oname{color:var(--t1);font-size:13.5px}
+.sc-sec{color:var(--t2);font-size:11.5px;margin-top:2px}
+.sc-fine{font-weight:700;color:var(--t1);white-space:nowrap;font-size:13.5px;text-align:right}
+.sc-fine small{display:block;font-weight:400;color:var(--t2);font-size:11px}
+.sc-tag{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:99px;margin-left:6px;border:1px solid var(--warn);color:var(--warn)}
+.sc-tag.crim{border-color:var(--danger);color:var(--danger)}
+.sc-tag.deemed{border-color:var(--accent-bright);color:var(--accent-bright)}
 </style>
 </head>
 <body>
@@ -1837,6 +1856,12 @@ function handleResponse(data) {
       lastAskSlotSig = null;
       break;
     }
+    case 'scenario':
+    case 'scenario_update': {
+      addBotBubble({ text: data.reply || '', chips: data.chips || [], scenario: data.scenario || null, fine_card: data.fine_card || null });
+      lastAskSlotSig = null;
+      break;
+    }
     case 'narrate': {
       if (data.reply || data.fine_card || (data.chips && data.chips.length)) {
         addBotBubble({
@@ -1903,11 +1928,52 @@ function addBotBubble(entry) {
   scrollBottom();
 }
 
+function fmtInr(n){ if(n==null) return '—'; return '₹'+Number(n).toLocaleString('en-IN'); }
+
+function buildScenarioCards(sc) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sc-wrap';
+  (sc.people || []).forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'sc-card' + (p.kind === 'victim' ? ' victim' : '');
+    const meta = [p.age != null ? p.age + ' yrs' : '', (p.roles || []).join(', ')].filter(Boolean).join(' · ');
+    const head = document.createElement('div');
+    head.className = 'sc-head';
+    head.innerHTML = `<div><span class="sc-name">${esc(p.label || 'Person')}</span>` +
+      (meta ? ` <span class="sc-meta">${esc(meta)}</span>` : '') + `</div>` +
+      (p.total_first && (p.offences || []).length > 1 ? `<span class="sc-total">Total ${fmtInr(p.total_first)}</span>` : '');
+    card.appendChild(head);
+    (p.offences || []).forEach(o => {
+      const row = document.createElement('div');
+      row.className = 'sc-off';
+      const tags = [];
+      if (o.certainty === 'may_be_liable') tags.push('<span class="sc-tag">may apply</span>');
+      if (o.deemed || o.juvenile) tags.push('<span class="sc-tag deemed">s.199A</span>');
+      if (o.severity === 'criminal') tags.push('<span class="sc-tag crim">criminal</span>');
+      const sub = [o.section, o.imprisonment ? 'jail: ' + o.imprisonment : '',
+                   o.compoundable === false ? 'goes to court' : '', o.licence_action || ''].filter(Boolean).join(' · ');
+      const rep = o.fine_repeat && o.fine_repeat !== o.fine_first ? `repeat ${fmtInr(o.fine_repeat)}` : '';
+      row.innerHTML = `<div><div class="sc-oname">${esc(o.name)}${tags.join('')}</div>` +
+        (sub ? `<div class="sc-sec">${esc(sub)}</div>` : '') + `</div>` +
+        `<div class="sc-fine">${o.fine_first ? fmtInr(o.fine_first) : 'court'}${rep ? `<small>${esc(rep)}</small>` : ''}</div>`;
+      card.appendChild(row);
+    });
+    wrap.appendChild(card);
+  });
+  return wrap;
+}
+
 function renderBotBubble(entry) {
   const wrapper = document.createElement('div');
   wrapper.className = 'msg bot';
 
-  if (entry.text) {
+  const sc = entry.scenario && (entry.scenario.people || []).length && entry.scenario.head != null ? entry.scenario : null;
+  if (sc) {
+    // structured: intro → one card per person → "may also apply / what to do / question"
+    if (sc.head) { const b = document.createElement('div'); b.className = 'bubble'; b.innerHTML = formatText(sc.head); wrapper.appendChild(b); }
+    wrapper.appendChild(buildScenarioCards(sc));
+    if (sc.tail) { const b = document.createElement('div'); b.className = 'bubble'; b.style.marginTop = '8px'; b.innerHTML = formatText(sc.tail); wrapper.appendChild(b); }
+  } else if (entry.text) {
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     bubble.innerHTML = formatText(entry.text);
@@ -1945,7 +2011,7 @@ function renderBotBubble(entry) {
     wrapper.appendChild(row);
   }
 
-  if (entry.fine_card) {
+  if (entry.fine_card && !sc) {
     wrapper.appendChild(buildFineCard(entry.fine_card, {
       updated:   !!entry.updated,
       canRevert: !!entry.canRevert,
@@ -2201,6 +2267,7 @@ function replayPersistedMessage(m) {
     chips:        payload.chips || [],
     slot:         payload.slot,
     fine_card:    payload.fine_card || null,
+    scenario:     payload.scenario || null,
     detail_table: payload.detail_table || null,
     diff:         payload.diff || null,
     previous_fine_card: payload.previous_fine_card || null,
@@ -2495,6 +2562,8 @@ function applyModeUI() {
   document.getElementById('mode-static').setAttribute('aria-selected', isStatic);
   document.getElementById('mode-dynamic').classList.toggle('active', !isStatic);
   document.getElementById('mode-dynamic').setAttribute('aria-selected', !isStatic);
+  // Calculator is chip-driven: no free-text bar. Only AI Chat shows the composer.
+  document.getElementById('input-row').style.display = isStatic ? 'none' : '';
   document.getElementById('msg-input').placeholder = inNarratePhase()
     ? 'Tell me what happened…'
     : sessionMode === 'dynamic'
@@ -2744,7 +2813,7 @@ async function checkHealth() {
     serverOnline = false;
     // On-device engine still answers, so surface that instead of a dead end.
     const canOffline = typeof DriveLegalOffline !== 'undefined';
-    badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>${canOffline ? 'On-device (offline)' : 'Server offline'}`;
+    badge.innerHTML = `<span class="status-dot" aria-hidden="true"></span>${canOffline ? 'Offline (rule-based)' : 'Server offline'}`;
     badge.className = canOffline ? 'ready' : 'error';
   }
 }

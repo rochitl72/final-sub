@@ -30,7 +30,7 @@ export default function RootLayout() {
     return (
       <View style={styles.boot}>
         <StatusBar style="light" />
-        <LinearGradient colors={Gradients.loginHero} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={Gradients.loginHero} style={StyleSheet.absoluteFill} />
         <FloatingLogo size={88} />
         <ActivityIndicator color={Colors.bluePale} style={styles.bootSpinner} />
       </View>

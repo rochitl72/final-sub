@@ -9,6 +9,7 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -18,7 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // @ts-ignore
 const _envUrl = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL;
-export const BASE_URL: string = _envUrl || 'http://127.0.0.1:8000';
+// Web (the PWA) is served by the backend itself → same-origin requests.
+export const BASE_URL: string = _envUrl || (Platform.OS === 'web' ? '' : 'http://127.0.0.1:8000');
 
 const CACHE_TTL_MS = 7 * 24 * 3600 * 1000;   // catalogs cached 7 days
 // F5 fix: bump CACHE_VERSION whenever catalog SHAPE changes (new vehicle
@@ -191,6 +193,7 @@ export interface Explanation {
 export interface TurnResponse {
   session_id:     string;
   intent:         string;
+  scenario?:      any;
   reply?:         string;
   question?:      string;
   slot?:          string;

@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#050d1f"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -47,7 +42,17 @@
       ],
       "expo-asset",
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#050d1f"
+        }
+      ],
+      "expo-status-bar",
+      "expo-audio"
     ],
     "scheme": "drivelegal",
     "extra": {

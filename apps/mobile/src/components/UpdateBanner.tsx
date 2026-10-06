@@ -93,7 +93,7 @@ export function UpdateBanner({ onDismiss, onUpdated }: Props) {
     <Animated.View style={[styles.wrap, { transform: [{ translateY: slideY }], opacity }]}>
       <LinearGradient
         colors={['#0d1f3c', '#112240']}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
@@ -104,7 +104,7 @@ export function UpdateBanner({ onDismiss, onUpdated }: Props) {
         {/* Icon + title row */}
         <View style={styles.titleRow}>
           <View style={styles.iconWrap}>
-            <LinearGradient colors={Gradients.blueGlow} style={StyleSheet.absoluteFillObject} />
+            <LinearGradient colors={Gradients.blueGlow} style={StyleSheet.absoluteFill} />
             <Ionicons name="cloud-download-outline" size={18} color={Colors.white} />
           </View>
           <View style={{ flex: 1 }}>

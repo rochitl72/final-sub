@@ -27,7 +27,7 @@ export function Logo({ size = 64, ring = true, glow = true, halo = false }: Logo
       {halo && (
         <LinearGradient
           colors={['rgba(37,99,235,0.45)', 'rgba(37,99,235,0)']}
-          style={[StyleSheet.absoluteFillObject, { borderRadius: size / 2, transform: [{ scale: 1.35 }] }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: size / 2, transform: [{ scale: 1.35 }] }]}
         />
       )}
       <View
@@ -46,7 +46,7 @@ export function Logo({ size = 64, ring = true, glow = true, halo = false }: Logo
             colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0)']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
         )}
         <Image

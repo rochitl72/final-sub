@@ -1,0 +1,2662 @@
+{
+ "_about": "Gold set for the Scenario Engine. Each case lists, per person, the offences that MUST be found ('must'), extra offences that are acceptable ('ok': may-apply or conditional ones), and which clarifying questions are useful ('questions': fact names; [] = no question needed). Person keys: 'self', a relation word ('son', 'friend', ...), or words that must appear in the person's label ('truck driver', 'owner', 'conductor'). Scored by scripts/eval_scenarios.py.",
+ "cases": [
+  {
+   "id": "G01",
+   "text": "My 16 year old son took my car without a licence, jumped a red light and hit a scooter. The scooter rider wasn't wearing a helmet. My son ran away after the accident.",
+   "must": {
+    "self": [
+     "DOC_UNDERAGE",
+     "SIGNAL_RED_LIGHT_JUMPING",
+     "ACC_HIT_AND_RUN"
+    ],
+    "scooter rider": [
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "son": [
+     "SIGNAL_RED_LIGHT_JUMPING",
+     "ACC_HIT_AND_RUN",
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_CAUSING_DEATH",
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "JUV_MINOR_DRIVING",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ],
+    "scooter rider": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [
+    "event.outcome"
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G02",
+   "text": "I was driving drunk with my seatbelt off and talking on my phone, and my friend in the back seat had no seatbelt either. Police stopped us.",
+   "must": {
+    "self": [
+     "IMPAIRED_DRUNK",
+     "SAFETY_NO_SEATBELT_DRIVER",
+     "DIST_MOBILE_USE",
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G03",
+   "text": "Truck driver was overloaded by 5 tonnes, no permit, and he was overspeeding on the highway. The owner knew about it.",
+   "must": {
+    "truck driver": [
+     "OVERLOAD_GOODS_WEIGHT",
+     "COMM_NO_PERMIT",
+     "SPEED_OVER_MMV_HMV"
+    ],
+    "owner": [
+     "OVERLOAD_GOODS_WEIGHT",
+     "COMM_NO_PERMIT"
+    ]
+   },
+   "ok": {
+    "truck driver": [
+     "DOC_NO_DL"
+    ],
+    "owner": [
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [
+    "actor.licence",
+    ""
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G04",
+   "text": "Me and two friends were on one bike, none of us had helmets, and I don't have a licence. The bike's insurance also expired.",
+   "must": {
+    "self": [
+     "SAFETY_NO_HELMET_RIDER",
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "DOC_NO_DL",
+     "DOC_NO_INSURANCE"
+    ],
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G05",
+   "text": "Auto driver refused to go by meter, overcharged me, and was carrying 6 passengers. Can I complain and what fine will he get?",
+   "must": {
+    "auto driver": [
+     "COMM_REFUSAL",
+     "COMM_OVERCHARGE",
+     "OVERLOAD_PASSENGER"
+    ]
+   },
+   "ok": {
+    "auto driver": [
+     "COMM_NO_FARE_METER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G06",
+   "text": "My friend borrowed my bike and got caught drunk driving. Am I also liable? He also didn't have the RC.",
+   "must": {
+    "friend": [
+     "IMPAIRED_DRUNK",
+     "DOC_NO_RC"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [
+    "actor.licence"
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G07",
+   "text": "A car hit me from behind while I was waiting at the signal and the driver drove off. I was on my scooter. What can I do and what is his fine?",
+   "must": {
+    "car driver": [
+     "ACC_HIT_AND_RUN"
+    ]
+   },
+   "ok": {
+    "car driver": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_CAUSING_DEATH",
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [
+    "event.outcome"
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G08",
+   "text": "my cousin was riding my scooty, police caught him for no helmet and they found the number plate was fancy and pollution certificate was expired, who pays what",
+   "must": {
+    "cousin": [
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_NO_PUC"
+    ],
+    "self": [
+     "MOD_FANCY_NUMBERPLATE"
+    ]
+   },
+   "ok": {
+    "cousin": [
+     "MOD_FANCY_NUMBERPLATE",
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "DOC_NO_PUC",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [
+    "actor.licence",
+    ""
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G09",
+   "text": "bus driver was on the phone while driving and the conductor let 20 extra people stand on the footboard",
+   "must": {
+    "bus driver": [
+     "DIST_MOBILE_USE",
+     "SAFETY_FOOTBOARD_TRAVEL"
+    ],
+    "conductor": [
+     "SAFETY_FOOTBOARD_TRAVEL"
+    ]
+   },
+   "ok": {
+    "bus driver": [
+     "OVERLOAD_PASSENGER"
+    ],
+    "conductor": [
+     "OVERLOAD_PASSENGER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G10",
+   "text": "I was going 90 in a 50 zone near a school with my kid on my lap in the front seat",
+   "must": {
+    "self": [
+     "SPEED_EXCESSIVE_50PLUS",
+     "SAFETY_NO_CHILD_RESTRAINT"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G11",
+   "text": "we were racing two bikes at night without headlights, one guy fell and got injured, police came",
+   "must": {
+    "self": [
+     "DANGER_RACING",
+     "LIGHT_NO_HEADLIGHTS_NIGHT"
+    ]
+   },
+   "ok": {
+    "self": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "CRIM_RASH_DRIVING_PUBLIC_WAY",
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G12",
+   "text": "My 15 year old daughter rode my scooty to school without a helmet and the police stopped her.",
+   "must": {
+    "self": [
+     "DOC_UNDERAGE",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "daughter": [
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "self": [
+     "JUV_MINOR_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G13",
+   "text": "I let my driver take the car, he jumped a signal and was on the phone. He doesn't have a licence.",
+   "must": {
+    "driver": [
+     "SIGNAL_RED_LIGHT_JUMPING",
+     "DIST_MOBILE_USE",
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G14",
+   "text": "I was riding without a helmet and my wife was sitting behind me without a helmet too",
+   "must": {
+    "self": [
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "wife": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "pillion": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G15",
+   "text": "The taxi driver was drunk and drove on the wrong side, I was a passenger in the back. Is he going to jail?",
+   "must": {
+    "taxi driver": [
+     "IMPAIRED_DRUNK",
+     "DIR_WRONG_WAY"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G16",
+   "text": "My brother crashed my car into a wall while texting. No one was hurt. Insurance had expired.",
+   "must": {
+    "brother": [
+     "DIST_MOBILE_USE",
+     "DOC_NO_INSURANCE"
+    ],
+    "self": [
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "ok": {
+    "brother": [
+     "DOC_NO_DL",
+     "DANGER_RASH_DRIVING"
+    ],
+    "self": [
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [
+    "actor.licence",
+    ""
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G17",
+   "text": "A truck driver rammed into our bike on the highway and ran away. My father got a fracture.",
+   "must": {
+    "truck driver": [
+     "ACC_HIT_AND_RUN",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "ok": {
+    "truck driver": [
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G18",
+   "text": "I parked on the footpath and my friend's car was double parked next to mine",
+   "must": {
+    "self": [
+     "PARK_FOOTPATH"
+    ],
+    "friend": [
+     "PARK_DOUBLE_PARKING"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G19",
+   "text": "School bus driver was overspeeding and the bus had no GPS or CCTV. Children were standing in the aisle.",
+   "must": {
+    "driver": [
+     "SPEED_OVER_MMV_HMV"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "OVERLOAD_PASSENGER",
+     "SCHOOL_BUS_GPS_CAMERA",
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ],
+    "operator": [
+     "SCHOOL_BUS_GPS_CAMERA",
+     "COMM_SCHOOL_BUS_VIOLATION",
+     "COMM_NO_GPS_VLTS"
+    ],
+    "owner": [
+     "COMM_NO_GPS_VLTS",
+     "OVERLOAD_PASSENGER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G20",
+   "text": "I gave my bike to my 17 year old nephew and he got caught triple riding with his friends, no helmets",
+   "must": {
+    "self": [
+     "DOC_UNDERAGE",
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "nephew": [
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "self": [
+     "SAFETY_NO_HELMET_PILLION",
+     "JUV_MINOR_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G21",
+   "text": "Daaru pi ke gaadi chala raha tha aur seat belt bhi nahi lagaya tha, police ne pakda",
+   "must": {
+    "self": [
+     "IMPAIRED_DRUNK",
+     "SAFETY_NO_SEATBELT_DRIVER"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G22",
+   "text": "teen log ek bike pe the, bina helmet, aur mera licence bhi nahi hai",
+   "must": {
+    "self": [
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_NO_DL"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "pillion": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G23",
+   "text": "My car has black film and a loud pressure horn, and the PUC expired last month. Police stopped me.",
+   "must": {
+    "self": [
+     "MOD_TINTED_GLASS",
+     "NOISE_PRESSURE_HORN",
+     "DOC_NO_PUC"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G24",
+   "text": "A lorry was carrying iron rods sticking out at the back and overloaded, the driver also had no licence",
+   "must": {
+    "lorry driver": [
+     "OVERLOAD_PROJECTING_LOAD",
+     "OVERLOAD_GOODS_WEIGHT",
+     "DOC_NO_DL"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "OVERLOAD_PROJECTING_LOAD",
+     "OVERLOAD_GOODS_WEIGHT",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ],
+    "driver": [
+     "OVERLOAD_PROJECTING_LOAD",
+     "OVERLOAD_GOODS_WEIGHT",
+     "DOC_NO_DL"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G25",
+   "text": "I jumped the red light and then took a U-turn where it wasn't allowed, a pedestrian was nearly hit",
+   "must": {
+    "self": [
+     "SIGNAL_RED_LIGHT_JUMPING",
+     "DIR_NO_UTURN"
+    ]
+   },
+   "ok": {
+    "self": [
+     "DANGER_RASH_DRIVING",
+     "CRIM_RASH_DRIVING_PUBLIC_WAY"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G26",
+   "text": "Ambulance was behind me with siren on and I didn't give way, I was also honking continuously",
+   "must": {
+    "self": [
+     "EMERG_NO_WAY_TO_AMBULANCE",
+     "NOISE_CONTINUOUS_HORN"
+    ]
+   },
+   "ok": {
+    "self": [
+     "EMERG_OBSTRUCT_AMBULANCE"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G27",
+   "text": "My colleague was driving our office cab without a permit and with a fake number plate",
+   "must": {
+    "colleague": [
+     "COMM_NO_PERMIT",
+     "MOD_FAKE_NUMBER_PLATE"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "COMM_NO_PERMIT",
+     "MOD_FAKE_NUMBER_PLATE"
+    ],
+    "operator": [
+     "COMM_NO_PERMIT"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G28",
+   "text": "I was on a call on my bike and my pillion friend had no helmet, we got a challan",
+   "must": {
+    "self": [
+     "DIST_MOBILE_USE"
+    ],
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "pillion": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G29",
+   "text": "The cab driver was sleepy after driving 16 hours straight and crashed into a divider, I was injured in the back seat",
+   "must": {
+    "cab driver": [
+     "ACC_DRIVER_FATIGUE"
+    ]
+   },
+   "ok": {
+    "cab driver": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "DANGER_RASH_DRIVING",
+     "ACC_NOT_REPORT"
+    ],
+    "employer": [
+     "ACC_DRIVER_FATIGUE"
+    ],
+    "operator": [
+     "ACC_DRIVER_FATIGUE"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G30",
+   "text": "I was speeding at 120 on a 80 road and my friend in the front seat wasn't wearing a seatbelt",
+   "must": {
+    "self": [
+     "SPEED_EXCESSIVE_50PLUS",
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ],
+    "self": [
+     "SPEED_OVER_LMV"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G31",
+   "text": "My 14 year old son was driving the tractor on the main road and hit a cyclist who got hurt",
+   "must": {
+    "self": [
+     "DOC_UNDERAGE"
+    ]
+   },
+   "ok": {
+    "son": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_NOT_REPORT"
+    ],
+    "self": [
+     "ACC_NOT_REPORT",
+     "JUV_MINOR_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G32",
+   "text": "Someone stole my car and was caught racing it at night",
+   "must": {},
+   "ok": {
+    "someone": [
+     "DANGER_RACING",
+     "DOC_TAKING_VEHICLE_WITHOUT_AUTH"
+    ],
+    "driver": [
+     "DANGER_RACING"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G33",
+   "text": "I didn't stop at the zebra crossing and also parked at the bus stop after that",
+   "must": {
+    "self": [
+     "PED_ZEBRA_VIOLATION",
+     "PARK_BUS_STOP"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G34",
+   "text": "Police caught my husband driving drunk, he refused the breathalyser test",
+   "must": {
+    "husband": [
+     "IMPAIRED_DRUNK",
+     "IMPAIRED_REFUSE_TEST"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G35",
+   "text": "Two guys on a bike snatched my chain and rode off the wrong way down a one way street without helmets",
+   "must": {
+    "rider": [
+     "DIR_ONE_WAY_VIOLATION",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "pillion": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "rider": [
+     "DIR_WRONG_WAY",
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "guys": [
+     "DIR_ONE_WAY_VIOLATION",
+     "SAFETY_NO_HELMET_RIDER",
+     "DIR_WRONG_WAY",
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G36",
+   "text": "My modified bike has a loud silencer and LED lights and I ride it without number plate",
+   "must": {
+    "self": [
+     "NOISE_MODIFIED_SILENCER",
+     "MOD_ILLEGAL_LED_HID",
+     "MOD_HSRP_MISSING"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G37",
+   "text": "I overtook from the left, cut across lanes and then the police said I was driving dangerously",
+   "must": {
+    "self": [
+     "DIR_ILLEGAL_OVERTAKING",
+     "DIR_CUTTING_LANE"
+    ]
+   },
+   "ok": {
+    "self": [
+     "DANGER_RASH_DRIVING",
+     "DIR_LANE_DISCIPLINE"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G38",
+   "text": "The auto had 7 school kids and the driver was smoking and on his phone",
+   "must": {
+    "auto driver": [
+     "OVERLOAD_PASSENGER",
+     "DIST_MOBILE_USE"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "OVERLOAD_PASSENGER",
+     "DIST_MOBILE_USE"
+    ],
+    "auto driver": [
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G39",
+   "text": "My employer makes our truck drivers drive 18 hours without rest and removed the speed governor",
+   "must": {
+    "employer": [
+     "ACC_DRIVER_FATIGUE"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "SPEED_GOVERNOR_TAMPER"
+    ],
+    "employer": [
+     "SPEED_GOVERNOR_TAMPER"
+    ],
+    "driver": [
+     "ACC_DRIVER_FATIGUE",
+     "SPEED_GOVERNOR_TAMPER"
+    ],
+    "operator": [
+     "SPEED_GOVERNOR_TAMPER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G40",
+   "text": "I hit a parked car while reversing and drove away without telling anyone",
+   "must": {
+    "self": [
+     "ACC_HIT_AND_RUN"
+    ]
+   },
+   "ok": {
+    "self": [
+     "ACC_NOT_REPORT",
+     "ACC_HIT_AND_RUN_RELATED"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G41",
+   "text": "my son is 12 and was riding his friend's electric scooter on the road",
+   "must": {
+    "self": [
+     "DOC_UNDERAGE"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "DOC_UNDERAGE"
+    ],
+    "friend": [
+     "DOC_UNDERAGE"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G42",
+   "text": "I was driving with an expired licence and no RC, and my car's fitness certificate also expired",
+   "must": {
+    "self": [
+     "DOC_NO_DL",
+     "DOC_NO_RC"
+    ]
+   },
+   "ok": {
+    "self": [
+     "DOC_NO_FITNESS",
+     "DOC_EXPIRED_RC"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G43",
+   "text": "Wife was driving our car, I was next to her without seat belt, she was talking on the phone",
+   "must": {
+    "wife": [
+     "DIST_MOBILE_USE",
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G44",
+   "text": "The bus conductor didn't let me on and the driver didn't stop at the bus stop, then he jumped a red light",
+   "must": {
+    "driver": [
+     "SIGNAL_RED_LIGHT_JUMPING"
+    ]
+   },
+   "ok": {
+    "conductor": [
+     "COMM_REFUSAL"
+    ],
+    "driver": [
+     "COMM_REFUSAL"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G45",
+   "text": "I was eating while driving and my 3 year old was in the front seat without a child seat",
+   "must": {
+    "self": [
+     "DIST_EATING_GROOMING",
+     "SAFETY_NO_CHILD_RESTRAINT"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G46",
+   "text": "Ola driver refused my ride, then took a longer route and overcharged me",
+   "must": {
+    "driver": [
+     "COMM_RIDE_HAILING_REFUSAL",
+     "COMM_OVERCHARGE"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "COMM_REFUSAL"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G47",
+   "text": "I'm 17 and was riding my dad's bike without a helmet",
+   "must": {
+    "dad": [
+     "DOC_UNDERAGE",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_UNDERAGE"
+    ],
+    "dad": [
+     "DOC_UNDERAGE",
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "father": [
+     "DOC_UNDERAGE",
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "owner": [
+     "DOC_UNDERAGE",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G48",
+   "text": "A drunk driver in an SUV ran over a pedestrian and the pedestrian died",
+   "must": {
+    "driver": [
+     "IMPAIRED_DRUNK",
+     "ACC_CAUSING_DEATH"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "DANGER_RASH_DRIVING",
+     "ACC_NOT_REPORT"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G49",
+   "text": "I drove through a no entry and parked in a disabled spot",
+   "must": {
+    "self": [
+     "DIR_NO_ENTRY",
+     "PARK_DISABLED_SPOT"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G50",
+   "text": "My uncle's goods tempo was carrying passengers in the back and had no insurance",
+   "must": {
+    "uncle": [
+     "OVERLOAD_GOODS_CARRYING_PASSENGERS",
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "OVERLOAD_GOODS_CARRYING_PASSENGERS",
+     "DOC_NO_INSURANCE"
+    ],
+    "owner": [
+     "OVERLOAD_GOODS_CARRYING_PASSENGERS",
+     "DOC_NO_INSURANCE"
+    ],
+    "uncle": [
+     "DOC_NO_DL",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G51",
+   "text": "I was doing wheelies on the highway with my friend recording from his bike without a helmet",
+   "must": {
+    "self": [
+     "DANGER_STUNT_WHEELIE"
+    ],
+    "friend": [
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "self": [
+     "CRIM_RASH_DRIVING_PUBLIC_WAY"
+    ],
+    "friend": [
+     "DIST_MOBILE_USE"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G52",
+   "text": "Police stopped me for no helmet and I showed them a fake licence",
+   "must": {
+    "self": [
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_FAKE_DL"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G53",
+   "text": "My daughter is 19, she was driving my car with headphones on and jumped the signal",
+   "must": {
+    "daughter": [
+     "DIST_HEADPHONES",
+     "SIGNAL_RED_LIGHT_JUMPING"
+    ]
+   },
+   "ok": {
+    "daughter": [
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [
+    "actor.licence",
+    ""
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G54",
+   "text": "Car driver opened his door suddenly and a cyclist fell, the cyclist got hurt",
+   "must": {
+    "car driver": [
+     "CYCLIST_DOORING"
+    ]
+   },
+   "ok": {
+    "car driver": [
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ],
+    "driver": [
+     "CYCLIST_DOORING",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G55",
+   "text": "I was riding without lights at night and without insurance, my pillion was my 10 year old son without a helmet",
+   "must": {
+    "self": [
+     "LIGHT_NO_HEADLIGHTS_NIGHT",
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION",
+     "SAFETY_NO_CHILD_2W"
+    ],
+    "son": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G56",
+   "text": "Our school van driver was drunk and the van had 15 kids in a 8 seater",
+   "must": {
+    "driver": [
+     "IMPAIRED_DRUNK",
+     "OVERLOAD_PASSENGER"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ],
+    "operator": [
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ],
+    "owner": [
+     "OVERLOAD_PASSENGER"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G57",
+   "text": "My friend and I were both drunk, he was driving my car and I was in the passenger seat",
+   "must": {
+    "friend": [
+     "IMPAIRED_DRUNK"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [
+    "actor.licence",
+    ""
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "G58",
+   "text": "The tanker driver carrying petrol had no hazardous goods papers and was going the wrong way",
+   "must": {
+    "driver": [
+     "DANGER_CARRYING_HAZARDOUS",
+     "DIR_WRONG_WAY"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "DANGER_CARRYING_HAZARDOUS"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G59",
+   "text": "I got fined for no helmet and my friend riding behind me got fined for no helmet too, total how much?",
+   "must": {
+    "self": [
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev"
+  },
+  {
+   "id": "G60",
+   "text": "A minor was driving a car in our street and crashed into my parked bike, his father owns the car",
+   "must": {
+    "father": [
+     "DOC_UNDERAGE"
+    ]
+   },
+   "ok": {
+    "minor": [
+     "DOC_UNDERAGE"
+    ],
+    "guardian": [
+     "DOC_UNDERAGE"
+    ],
+    "owner": [
+     "DOC_UNDERAGE"
+    ],
+    "parent": [
+     "DOC_UNDERAGE"
+    ],
+    "driver": [
+     "DOC_UNDERAGE"
+    ]
+   },
+   "questions": [
+    "event.outcome",
+    ""
+   ],
+   "split": "dev"
+  },
+  {
+   "id": "H01",
+   "text": "My younger brother who is 16 took my scooter at night without telling me and crashed into an auto, the auto driver had a fracture",
+   "must": {
+    "brother": [
+     "DOC_TAKING_VEHICLE_WITHOUT_AUTH"
+    ]
+   },
+   "ok": {
+    "brother": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "DOC_NO_DL",
+     "ACC_NOT_REPORT",
+     "DANGER_RASH_DRIVING"
+    ],
+    "self": [
+     "DOC_UNDERAGE",
+     "JUV_MINOR_DRIVING",
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_NOT_REPORT"
+    ],
+    "guardian": [
+     "DOC_UNDERAGE",
+     "JUV_MINOR_DRIVING",
+     "ACC_NOT_REPORT"
+    ]
+   },
+   "questions": [
+    ""
+   ],
+   "split": "dev2"
+  },
+  {
+   "id": "H02",
+   "text": "I was caught using my phone at a red signal and my seat belt was not on",
+   "must": {
+    "self": [
+     "DIST_MOBILE_USE",
+     "SAFETY_NO_SEATBELT_DRIVER"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H03",
+   "text": "The private bus was racing with another bus and hit a man crossing the road, the man died",
+   "must": {
+    "driver": [
+     "DANGER_RACING",
+     "ACC_CAUSING_DEATH"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "CRIM_RASH_DRIVING_PUBLIC_WAY",
+     "DANGER_RASH_DRIVING",
+     "ACC_NOT_REPORT",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ],
+    "bus driver": [
+     "DANGER_RACING",
+     "ACC_CAUSING_DEATH",
+     "CRIM_RASH_DRIVING_PUBLIC_WAY",
+     "DANGER_RASH_DRIVING",
+     "ACC_NOT_REPORT"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H04",
+   "text": "Me and my sister were going on scooty without helmets, she was riding",
+   "must": {
+    "sister": [
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "ok": {
+    "sister": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H05",
+   "text": "A lorry driver parked his lorry on the highway at night without any lights and my car hit it",
+   "must": {
+    "lorry driver": [
+     "PARK_NIGHT_NO_LIGHTS"
+    ]
+   },
+   "ok": {
+    "lorry driver": [
+     "HWY_STOP_ON_SHOULDER",
+     "LIGHT_NO_HEADLIGHTS_NIGHT",
+     "PARK_NO_PARKING"
+    ],
+    "driver": [
+     "PARK_NIGHT_NO_LIGHTS",
+     "HWY_STOP_ON_SHOULDER",
+     "LIGHT_NO_HEADLIGHTS_NIGHT"
+    ]
+   },
+   "questions": [
+    "event.outcome",
+    ""
+   ],
+   "split": "dev2"
+  },
+  {
+   "id": "H06",
+   "text": "Got a challan for overspeeding on the expressway and for not having fastag",
+   "must": {
+    "self": [
+     "SPEED_OVER_LMV",
+     "FASTAG_NONE"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SPEED_OVER_MMV_HMV",
+     "HWY_MIN_SPEED_VIOLATION"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H07",
+   "text": "My neighbour's son, he's 15, rides his father's bike around the colony every day with two friends",
+   "must": {
+    "father": [
+     "DOC_UNDERAGE",
+     "SAFETY_MORE_THAN_2_ON_2W"
+    ]
+   },
+   "ok": {
+    "son": [
+     "DOC_UNDERAGE",
+     "SAFETY_MORE_THAN_2_ON_2W"
+    ],
+    "guardian": [
+     "DOC_UNDERAGE",
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "JUV_MINOR_DRIVING"
+    ],
+    "neighbour": [
+     "DOC_UNDERAGE",
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "JUV_MINOR_DRIVING"
+    ],
+    "owner": [
+     "DOC_UNDERAGE",
+     "SAFETY_MORE_THAN_2_ON_2W"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H08",
+   "text": "The traffic police stopped me for tinted glass and I argued and refused to show my documents",
+   "must": {
+    "self": [
+     "MOD_TINTED_GLASS",
+     "DOC_DISOBEY_AUTHORITY"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SIGNAL_DISOBEY_POLICE_SIGNAL"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H09",
+   "text": "My dad was driving drunk and my 8 year old brother was sitting in front without a seatbelt",
+   "must": {
+    "dad": [
+     "IMPAIRED_DRUNK",
+     "SAFETY_NO_CHILD_RESTRAINT"
+    ]
+   },
+   "ok": {
+    "dad": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ],
+    "brother": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H10",
+   "text": "A cab hit me while I was crossing at the zebra crossing, the driver didn't stop",
+   "must": {
+    "driver": [
+     "PED_ZEBRA_VIOLATION",
+     "ACC_HIT_AND_RUN"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_CAUSING_DEATH",
+     "DANGER_RASH_DRIVING"
+    ],
+    "cab driver": [
+     "PED_ZEBRA_VIOLATION",
+     "ACC_HIT_AND_RUN",
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_CAUSING_DEATH"
+    ]
+   },
+   "questions": [
+    "event.outcome"
+   ],
+   "split": "dev2"
+  },
+  {
+   "id": "H11",
+   "text": "I was driving my company's truck which was overloaded, the company owner asked me to carry extra load",
+   "must": {
+    "self": [
+     "OVERLOAD_GOODS_WEIGHT"
+    ],
+    "owner": [
+     "OVERLOAD_GOODS_WEIGHT"
+    ]
+   },
+   "ok": {
+    "employer": [
+     "OVERLOAD_GOODS_WEIGHT"
+    ],
+    "company": [
+     "OVERLOAD_GOODS_WEIGHT"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H12",
+   "text": "bina helmet aur bina licence ke bike chala raha tha, police ne pakda",
+   "must": {
+    "self": [
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_NO_DL"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H13",
+   "text": "The school van had no lady attendant and the driver was speeding near the school",
+   "must": {
+    "driver": [
+     "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE"
+    ]
+   },
+   "ok": {
+    "operator": [
+     "SCHOOL_BUS_GPS_CAMERA",
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ],
+    "owner": [
+     "SCHOOL_BUS_GPS_CAMERA",
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ],
+    "driver": [
+     "SCHOOL_BUS_GPS_CAMERA",
+     "COMM_SCHOOL_BUS_VIOLATION",
+     "SPEED_OVER_MMV_HMV",
+     "SPEED_OVER_LMV"
+    ],
+    "van driver": [
+     "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE",
+     "SCHOOL_BUS_GPS_CAMERA",
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H14",
+   "text": "My husband borrowed his friend's car, it had no insurance and he jumped a red light",
+   "must": {
+    "husband": [
+     "SIGNAL_RED_LIGHT_JUMPING",
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "DOC_NO_INSURANCE"
+    ],
+    "owner": [
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H15",
+   "text": "I was riding on the footpath to avoid traffic and hit a pedestrian, he got a small cut",
+   "must": {
+    "self": [
+     "PED_FOOTPATH_DRIVING",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "ok": {
+    "self": [
+     "DANGER_RASH_DRIVING",
+     "ACC_NOT_REPORT"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H16",
+   "text": "two of us on a scooter, my friend riding, he was on a call and we both had no helmets",
+   "must": {
+    "friend": [
+     "DIST_MOBILE_USE",
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H17",
+   "text": "The auto rickshaw driver was smoking weed and driving rashly with three school kids inside",
+   "must": {
+    "auto driver": [
+     "IMPAIRED_DRUGS",
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "ok": {
+    "auto driver": [
+     "CRIM_RASH_DRIVING_PUBLIC_WAY",
+     "OVERLOAD_PASSENGER",
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ],
+    "driver": [
+     "IMPAIRED_DRUGS",
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H18",
+   "text": "I let my 17 year old drive my car on the highway and he was overspeeding",
+   "must": {
+    "self": [
+     "DOC_UNDERAGE",
+     "SPEED_OVER_LMV"
+    ]
+   },
+   "ok": {
+    "self": [
+     "JUV_MINOR_DRIVING"
+    ],
+    "son": [
+     "SPEED_OVER_LMV",
+     "DOC_UNDERAGE"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H19",
+   "text": "A tractor carrying people on its trolley was driving on the wrong side of the highway",
+   "must": {
+    "driver": [
+     "DIR_WRONG_WAY",
+     "OVERLOAD_GOODS_CARRYING_PASSENGERS"
+    ]
+   },
+   "ok": {
+    "tractor driver": [
+     "DIR_WRONG_WAY",
+     "OVERLOAD_GOODS_CARRYING_PASSENGERS",
+     "OVERLOAD_PASSENGER"
+    ],
+    "driver": [
+     "OVERLOAD_PASSENGER"
+    ],
+    "owner": [
+     "OVERLOAD_GOODS_CARRYING_PASSENGERS"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H20",
+   "text": "I didn't have my RC with me and the PUC was expired, also my number plate isn't HSRP",
+   "must": {
+    "self": [
+     "DOC_NO_RC",
+     "DOC_NO_PUC",
+     "MOD_HSRP_MISSING"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H21",
+   "text": "My wife was driving and our 2 year old was on her lap in the front seat",
+   "must": {
+    "wife": [
+     "SAFETY_NO_CHILD_RESTRAINT"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H22",
+   "text": "An ambulance was stuck behind a car that refused to move and the car driver kept honking at it",
+   "must": {
+    "car driver": [
+     "EMERG_OBSTRUCT_AMBULANCE"
+    ]
+   },
+   "ok": {
+    "car driver": [
+     "EMERG_NO_WAY_TO_AMBULANCE",
+     "NOISE_CONTINUOUS_HORN"
+    ],
+    "driver": [
+     "EMERG_OBSTRUCT_AMBULANCE",
+     "EMERG_NO_WAY_TO_AMBULANCE",
+     "NOISE_CONTINUOUS_HORN"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H23",
+   "text": "My uber driver was speeding at 100 in a 60 zone and using his phone, I'm the passenger, what fine will he get",
+   "must": {
+    "driver": [
+     "SPEED_EXCESSIVE_50PLUS",
+     "DIST_MOBILE_USE"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "SPEED_OVER_LMV"
+    ],
+    "uber driver": [
+     "SPEED_EXCESSIVE_50PLUS",
+     "DIST_MOBILE_USE",
+     "SPEED_OVER_LMV"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H24",
+   "text": "I was drunk and crashed my bike into a divider, nobody else was involved but I broke my arm",
+   "must": {
+    "self": [
+     "IMPAIRED_DRUNK"
+    ]
+   },
+   "ok": {
+    "self": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_NOT_REPORT",
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H25",
+   "text": "A guy on a bike snatched my phone and the police later found the bike had a fake number plate and no RC",
+   "must": {
+    "rider": [
+     "MOD_FAKE_NUMBER_PLATE",
+     "DOC_NO_RC"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "MOD_FAKE_NUMBER_PLATE"
+    ],
+    "guy": [
+     "MOD_FAKE_NUMBER_PLATE",
+     "DOC_NO_RC"
+    ],
+    "driver": [
+     "MOD_FAKE_NUMBER_PLATE",
+     "DOC_NO_RC"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H26",
+   "text": "My driver was driving our car 14 hours straight, he dozed off and hit a tree, no one was hurt",
+   "must": {
+    "driver": [
+     "ACC_DRIVER_FATIGUE"
+    ]
+   },
+   "ok": {
+    "self": [
+     "ACC_DRIVER_FATIGUE"
+    ],
+    "employer": [
+     "ACC_DRIVER_FATIGUE"
+    ],
+    "driver": [
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H27",
+   "text": "Me and my cousin were doing stunts on our bikes on the main road and he wasn't wearing a helmet",
+   "must": {
+    "self": [
+     "DANGER_STUNT_WHEELIE"
+    ],
+    "cousin": [
+     "DANGER_STUNT_WHEELIE",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "self": [
+     "CRIM_RASH_DRIVING_PUBLIC_WAY"
+    ],
+    "cousin": [
+     "CRIM_RASH_DRIVING_PUBLIC_WAY"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H28",
+   "text": "The truck had a pressure horn and no reflectors at the back, and the driver had only a learner's licence",
+   "must": {
+    "truck driver": [
+     "NOISE_PRESSURE_HORN",
+     "MOD_NO_REAR_REFLECTOR",
+     "DOC_NO_DL"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "NOISE_PRESSURE_HORN",
+     "MOD_NO_REAR_REFLECTOR",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ],
+    "driver": [
+     "NOISE_PRESSURE_HORN",
+     "MOD_NO_REAR_REFLECTOR",
+     "DOC_NO_DL"
+    ]
+   },
+   "questions": [
+    "owner.permitted",
+    ""
+   ],
+   "split": "dev2"
+  },
+  {
+   "id": "H29",
+   "text": "I parked in front of a fire hydrant and my car got towed, my friend's bike next to it was on the footpath",
+   "must": {
+    "self": [
+     "PARK_FIRE_HYDRANT"
+    ],
+    "friend": [
+     "PARK_FOOTPATH"
+    ]
+   },
+   "ok": {
+    "self": [
+     "PARK_NO_PARKING"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "H30",
+   "text": "A bus driver overtook from the wrong side and crashed into my car, I got injured and he ran away",
+   "must": {
+    "bus driver": [
+     "DIR_ILLEGAL_OVERTAKING",
+     "ACC_HIT_AND_RUN",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "ok": {
+    "bus driver": [
+     "DANGER_RASH_DRIVING",
+     "DIR_WRONG_WAY"
+    ]
+   },
+   "questions": [],
+   "split": "dev2"
+  },
+  {
+   "id": "B01",
+   "text": "My nephew is 17, he was driving my car with four friends and got caught for drunk driving",
+   "must": {
+    "self": [
+     "DOC_UNDERAGE",
+     "IMPAIRED_DRUNK"
+    ]
+   },
+   "ok": {
+    "nephew": [
+     "IMPAIRED_DRUNK",
+     "DOC_UNDERAGE"
+    ],
+    "self": [
+     "JUV_MINOR_DRIVING",
+     "OVERLOAD_PASSENGER"
+    ],
+    "guardian": [
+     "DOC_UNDERAGE",
+     "IMPAIRED_DRUNK",
+     "JUV_MINOR_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B02",
+   "text": "I was stopped for not wearing a helmet, and my bike's RC and insurance were both expired",
+   "must": {
+    "self": [
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "ok": {
+    "self": [
+     "DOC_EXPIRED_RC",
+     "DOC_NO_RC"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B03",
+   "text": "The share auto driver jumped the signal and hit my mother who was crossing the road, she broke her leg",
+   "must": {
+    "auto driver": [
+     "SIGNAL_RED_LIGHT_JUMPING",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "ok": {
+    "auto driver": [
+     "ACC_NOT_REPORT",
+     "DANGER_RASH_DRIVING",
+     "PED_ZEBRA_VIOLATION"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B04",
+   "text": "My roommate took my bike without asking and got a challan for riding on the wrong side",
+   "must": {
+    "roommate": [
+     "DIR_WRONG_WAY",
+     "DOC_TAKING_VEHICLE_WITHOUT_AUTH"
+    ]
+   },
+   "ok": {
+    "roommate": [
+     "DOC_NO_DL"
+    ]
+   },
+   "questions": [
+    "actor.licence",
+    ""
+   ],
+   "split": "held_out"
+  },
+  {
+   "id": "B05",
+   "text": "we were 4 people in an auto meant for 3 and the driver was drunk",
+   "must": {
+    "auto driver": [
+     "OVERLOAD_PASSENGER",
+     "IMPAIRED_DRUNK"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "OVERLOAD_PASSENGER",
+     "IMPAIRED_DRUNK"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B06",
+   "text": "I was driving at 140 on the highway where the limit is 80 and talking on the phone",
+   "must": {
+    "self": [
+     "SPEED_EXCESSIVE_50PLUS",
+     "DIST_MOBILE_USE"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SPEED_OVER_LMV"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B07",
+   "text": "A truck carrying sand without cover was overloaded and the driver didn't have a licence",
+   "must": {
+    "truck driver": [
+     "OVERLOAD_GOODS_WEIGHT",
+     "DOC_NO_DL"
+    ]
+   },
+   "ok": {
+    "owner": [
+     "OVERLOAD_GOODS_WEIGHT",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ],
+    "driver": [
+     "OVERLOAD_GOODS_WEIGHT",
+     "DOC_NO_DL",
+     "OVERLOAD_PROJECTING_LOAD"
+    ],
+    "truck driver": [
+     "OVERLOAD_PROJECTING_LOAD"
+    ]
+   },
+   "questions": [
+    "owner.permitted",
+    ""
+   ],
+   "split": "held_out"
+  },
+  {
+   "id": "B08",
+   "text": "My son is 13, he was riding his cycle and a car hit him and drove away",
+   "must": {
+    "car driver": [
+     "ACC_HIT_AND_RUN"
+    ]
+   },
+   "ok": {
+    "car driver": [
+     "CRIM_HURT_RASH_NEGLIGENT",
+     "ACC_CAUSING_DEATH",
+     "DANGER_RASH_DRIVING"
+    ],
+    "driver": [
+     "ACC_HIT_AND_RUN",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "questions": [
+    "event.outcome"
+   ],
+   "split": "held_out"
+  },
+  {
+   "id": "B09",
+   "text": "Police fined my brother for no seatbelt and for having tinted windows on my car",
+   "must": {
+    "brother": [
+     "SAFETY_NO_SEATBELT_DRIVER"
+    ],
+    "self": [
+     "MOD_TINTED_GLASS"
+    ]
+   },
+   "ok": {
+    "brother": [
+     "MOD_TINTED_GLASS"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B10",
+   "text": "I took a U-turn on the flyover and then parked in a no parking zone",
+   "must": {
+    "self": [
+     "DIR_NO_UTURN",
+     "PARK_NO_PARKING"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B11",
+   "text": "The bus driver didn't stop for the ambulance and kept honking in the hospital zone",
+   "must": {
+    "bus driver": [
+     "EMERG_NO_WAY_TO_AMBULANCE",
+     "NOISE_HORN_SILENT_ZONE"
+    ]
+   },
+   "ok": {
+    "bus driver": [
+     "NOISE_CONTINUOUS_HORN",
+     "EMERG_OBSTRUCT_AMBULANCE"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B12",
+   "text": "Main aur mera dost bike pe the, dost chala raha tha, uske paas licence nahi tha aur helmet bhi nahi",
+   "must": {
+    "friend": [
+     "DOC_NO_DL",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B13",
+   "text": "My driver drove our company car drunk and crashed into a shop, nobody was hurt",
+   "must": {
+    "driver": [
+     "IMPAIRED_DRUNK"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "DANGER_RASH_DRIVING",
+     "ACC_NOT_REPORT"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B14",
+   "text": "A 16 year old boy was doing stunts on a scooter near my house without a helmet",
+   "must": {
+    "guardian": [
+     "DOC_UNDERAGE",
+     "DANGER_STUNT_WHEELIE"
+    ]
+   },
+   "ok": {
+    "boy": [
+     "DANGER_STUNT_WHEELIE",
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_UNDERAGE"
+    ],
+    "guardian": [
+     "SAFETY_NO_HELMET_RIDER",
+     "JUV_MINOR_DRIVING"
+    ],
+    "owner": [
+     "DOC_UNDERAGE",
+     "DANGER_STUNT_WHEELIE",
+     "SAFETY_NO_HELMET_RIDER"
+    ],
+    "rider": [
+     "DANGER_STUNT_WHEELIE",
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_UNDERAGE"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B15",
+   "text": "My father drove through a red light and our car had no PUC, I was in the back seat without a seat belt",
+   "must": {
+    "father": [
+     "SIGNAL_RED_LIGHT_JUMPING",
+     "DOC_NO_PUC",
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ],
+    "father": [
+     "DOC_NO_PUC"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B16",
+   "text": "The cab I booked on Uber had no meter and the driver had no badge",
+   "must": {
+    "driver": [
+     "COMM_NO_BADGE"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "COMM_NO_FARE_METER"
+    ],
+    "cab driver": [
+     "COMM_NO_BADGE",
+     "COMM_NO_FARE_METER"
+    ],
+    "uber driver": [
+     "COMM_NO_BADGE",
+     "COMM_NO_FARE_METER"
+    ],
+    "operator": [
+     "COMM_NO_FARE_METER"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B17",
+   "text": "I rear ended a car because I was looking at my phone, the other driver's neck got hurt",
+   "must": {
+    "self": [
+     "DIST_MOBILE_USE",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "ok": {
+    "self": [
+     "ACC_NOT_REPORT",
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B18",
+   "text": "My bike has a modified silencer and my friend rides it every day without a licence",
+   "must": {
+    "friend": [
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "NOISE_MODIFIED_SILENCER",
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "NOISE_MODIFIED_SILENCER"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "B19",
+   "text": "Lorry was parked on the highway shoulder at night and our car crashed into it, my wife died",
+   "must": {
+    "lorry driver": [
+     "PARK_NIGHT_NO_LIGHTS"
+    ]
+   },
+   "ok": {
+    "lorry driver": [
+     "HWY_STOP_ON_SHOULDER",
+     "LIGHT_NO_HEADLIGHTS_NIGHT",
+     "ACC_CAUSING_DEATH"
+    ],
+    "driver": [
+     "PARK_NIGHT_NO_LIGHTS",
+     "HWY_STOP_ON_SHOULDER"
+    ],
+    "self": [
+     "ACC_CAUSING_DEATH"
+    ]
+   },
+   "questions": [
+    ""
+   ],
+   "split": "held_out"
+  },
+  {
+   "id": "B20",
+   "text": "Three of us on the scooty, my cousin riding, nobody had helmets, and the cops said the scooty's insurance lapsed",
+   "must": {
+    "cousin": [
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_HELMET_PILLION",
+     "DOC_NO_INSURANCE"
+    ],
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "pillion": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "cousin": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "held_out"
+  },
+  {
+   "id": "C01",
+   "text": "My brother was riding without a helmet and without a licence, and I was sitting behind him on the bike with no helmet too",
+   "must": {
+    "brother": [
+     "SAFETY_NO_HELMET_RIDER",
+     "DOC_NO_DL"
+    ],
+    "self": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C02",
+   "text": "The cab driver was talking on his phone and jumped a red light with us in the back",
+   "must": {
+    "cab driver": [
+     "DIST_MOBILE_USE",
+     "SIGNAL_RED_LIGHT_JUMPING"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "DIST_MOBILE_USE",
+     "SIGNAL_RED_LIGHT_JUMPING"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C03",
+   "text": "I parked my car on the footpath and the traffic police also noticed my number plate was missing HSRP",
+   "must": {
+    "self": [
+     "PARK_FOOTPATH",
+     "MOD_HSRP_MISSING"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C04",
+   "text": "A tempo carrying goods was going the wrong way on a one-way road and the driver had no licence",
+   "must": {
+    "tempo driver": [
+     "DIR_ONE_WAY_VIOLATION",
+     "DOC_NO_DL"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "DIR_ONE_WAY_VIOLATION",
+     "DIR_WRONG_WAY",
+     "DOC_NO_DL"
+    ],
+    "tempo driver": [
+     "DIR_WRONG_WAY"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C05",
+   "text": "I was overtaking from the wrong side on the highway at 120 in a 80 zone",
+   "must": {
+    "self": [
+     "DIR_ILLEGAL_OVERTAKING",
+     "SPEED_OVER_LMV"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SPEED_EXCESSIVE_50PLUS",
+     "SPEED_OVER_MMV_HMV"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C06",
+   "text": "My father let my 15 year old cousin drive his scooter and the cousin knocked a pedestrian who was hurt",
+   "must": {
+    "cousin": [
+     "DOC_UNDERAGE"
+    ]
+   },
+   "ok": {
+    "father": [
+     "DOC_UNDERAGE",
+     "DOC_UNAUTHORIZED_USE_VEHICLE",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ],
+    "cousin": [
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ],
+    "self": [
+     "DOC_UNDERAGE"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C07",
+   "text": "The school bus driver was drunk and the bus had no CCTV or GPS",
+   "must": {
+    "bus driver": [
+     "IMPAIRED_DRUNK"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "IMPAIRED_DRUNK"
+    ],
+    "bus driver": [
+     "SCHOOL_BUS_GPS_CAMERA",
+     "COMM_SCHOOL_BUS_VIOLATION"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C08",
+   "text": "I drove my car at night with both headlights off and my front seat passenger had no seatbelt",
+   "must": {
+    "self": [
+     "LIGHT_NO_HEADLIGHTS_NIGHT"
+    ],
+    "passenger": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "ok": {
+    "self": [
+     "SAFETY_NO_SEATBELT_PASSENGER"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C09",
+   "text": "The auto driver refused to go to the station and also asked for double the fare",
+   "must": {
+    "auto driver": [
+     "COMM_REFUSAL",
+     "COMM_OVERCHARGE"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "COMM_REFUSAL",
+     "COMM_OVERCHARGE"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C10",
+   "text": "I was racing my friend on the road, he was doing a wheelie on his bike with no helmet",
+   "must": {
+    "self": [
+     "DANGER_RACING"
+    ],
+    "friend": [
+     "DANGER_STUNT_WHEELIE",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "DANGER_RACING"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C11",
+   "text": "My car has no pollution certificate and the insurance ran out last month",
+   "must": {
+    "self": [
+     "DOC_NO_PUC",
+     "DOC_NO_INSURANCE"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C12",
+   "text": "The truck was carrying iron rods sticking out of the back far beyond the body and had no reflectors",
+   "must": {
+    "truck driver": [
+     "OVERLOAD_PROJECTING_LOAD",
+     "MOD_NO_REAR_REFLECTOR"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "OVERLOAD_PROJECTING_LOAD",
+     "MOD_NO_REAR_REFLECTOR"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C13",
+   "text": "I stopped on the zebra crossing at the signal and then honked continuously at the pedestrians",
+   "must": {
+    "self": [
+     "PARK_ZEBRA_CROSSING",
+     "NOISE_CONTINUOUS_HORN"
+    ]
+   },
+   "ok": {
+    "self": [
+     "PED_ZEBRA_VIOLATION"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C14",
+   "text": "My uncle was drunk, driving without a seatbelt, and hit a parked car then left the spot",
+   "must": {
+    "uncle": [
+     "IMPAIRED_DRUNK",
+     "SAFETY_NO_SEATBELT_DRIVER",
+     "ACC_HIT_AND_RUN"
+    ]
+   },
+   "ok": {
+    "uncle": [
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C15",
+   "text": "I took a U-turn where it was prohibited and entered a no entry road to avoid the jam",
+   "must": {
+    "self": [
+     "DIR_NO_UTURN",
+     "DIR_NO_ENTRY"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C16",
+   "text": "The Ola driver had a fake number plate and no permit for commercial use",
+   "must": {
+    "driver": [
+     "MOD_FAKE_NUMBER_PLATE",
+     "COMM_NO_PERMIT"
+    ]
+   },
+   "ok": {
+    "ola driver": [
+     "MOD_FAKE_NUMBER_PLATE",
+     "COMM_NO_PERMIT"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C17",
+   "text": "We were three on a bike, nobody wore a helmet, and I was the one riding",
+   "must": {
+    "self": [
+     "SAFETY_MORE_THAN_2_ON_2W",
+     "SAFETY_NO_HELMET_RIDER"
+    ]
+   },
+   "ok": {
+    "friend": [
+     "SAFETY_NO_HELMET_PILLION"
+    ],
+    "pillion": [
+     "SAFETY_NO_HELMET_PILLION"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C18",
+   "text": "He used the horn right outside the hospital and did not give way to the ambulance behind him",
+   "must": {
+    "he": [
+     "NOISE_HORN_SILENT_ZONE",
+     "EMERG_NO_WAY_TO_AMBULANCE"
+    ]
+   },
+   "ok": {
+    "driver": [
+     "NOISE_HORN_SILENT_ZONE",
+     "EMERG_NO_WAY_TO_AMBULANCE"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C19",
+   "text": "My wife was driving over the speed limit and using her phone when she hit a cyclist who was badly hurt",
+   "must": {
+    "wife": [
+     "SPEED_OVER_LMV",
+     "DIST_MOBILE_USE",
+     "CRIM_HURT_RASH_NEGLIGENT"
+    ]
+   },
+   "ok": {
+    "wife": [
+     "DANGER_RASH_DRIVING"
+    ]
+   },
+   "questions": [],
+   "split": "held_out2"
+  },
+  {
+   "id": "C20",
+   "text": "I let my friend who has no licence drive my car and he crossed the stop line at a red light",
+   "must": {
+    "friend": [
+     "DOC_NO_DL",
+     "SIGNAL_RED_LIGHT_JUMPING"
+    ],
+    "self": [
+     "DOC_UNAUTHORIZED_USE_VEHICLE"
+    ]
+   },
+   "ok": {},
+   "questions": [],
+   "split": "held_out2"
+  }
+ ]
+}

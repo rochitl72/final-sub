@@ -54,7 +54,7 @@ export function AiModePill({ pillVariant, pillLabel, onToggle }: Props) {
       <Animated.View style={[styles.pillWrap, { opacity: fadeAnim }]}>
         <LinearGradient
           colors={meta.bg}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     overflow:          'hidden',
   },
   pillBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: Radius.full,
     borderWidth:  1,
   },

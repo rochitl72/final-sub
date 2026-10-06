@@ -20,13 +20,14 @@ state/city-specific fine — never a hallucinated number.
 It runs across a **FastAPI backend**, an **Expo (React Native) mobile app**, and a
 **Progressive Web App** — and it works **online *and* fully offline**.
 
-## The three AI modes
+> **Main version: the DriveLegal PWA** — the web build of the mobile app (`apps/mobile`, same UI, desktop layout on wide screens), installable and offline-capable, served by the backend at `/`. The same code runs natively in Expo Go. See [docs/PWA.md](docs/PWA.md).
+
+## The two modes
 
 | Mode | How it works | Needs internet? |
 |------|--------------|-----------------|
-| ☁️ **Cloud AI** | Groq (gpt-oss-20b by default, auto-selected) narrates over the graph; best language quality | Yes |
-| 📋 **Rules (Offline)** | Deterministic resolver + graph fine-cascade — instant, exact, 100% grounded | No |
-| 🔌 **On-device AI** | A real LLM (Llama-3.2-1B via **WebLLM / WebGPU**) running *in the browser*, offline, with on-device RAG over the graph | No (after first model download) |
+| ☁️ **AI Chat** | Groq (gpt-oss-20b by default, auto-selected) narrates over the graph; best language quality | Yes |
+| 📋 **Calculator (rule-based)** | Chip-driven: deterministic resolver + graph fine-cascade — instant, exact, 100% grounded. Also the offline fallback for AI Chat | No |
 
 **Across every mode, the fine amount always comes from the graph** — the language
 model only phrases the answer, so it can never misquote a penalty.
@@ -38,8 +39,7 @@ model only phrases the answer, so it can never misquote a penalty.
 - **Location aware** — GPS, map pin (Leaflet), or state→city picker; fines adjust to
   your state/city (e.g. no-helmet is ₹500 in Karnataka, ₹1,000 in Tamil Nadu).
 - **Truly offline** — the knowledge graph, resolver, and narration are ported to the
-  client, so the app answers with zero network. The on-device model even runs an LLM
-  offline via WebGPU.
+  client, so the rule-based engine answers with zero network.
 - **Conversational** — multi-turn memory, follow-ups ("is it compoundable?"), a safety
   guardrail that refuses bribery/forgery requests, out-of-scope handling, and coherence
   checks (helmet vs seat belt).
@@ -66,9 +66,9 @@ model only phrases the answer, so it can never misquote a penalty.
    │  dynamic chatbot (LLM)│                         │  (mobile app + PWA)       │
    │  gov scraper + patches│                         └──────────────────────────┘
    └──────────┬────────────┘                                      │
-              │ Groq / Sarvam                                     │ WebLLM (WebGPU)
+              │ Groq / Sarvam                                     │
               ▼                                                    ▼
-        Cloud AI mode                                    On-device AI mode (offline)
+        AI Chat mode                                     Rule-based offline fallback
 ```
 
 **Grounding principle:** the model narrates, the graph adjudicates. Every ₹ amount is
@@ -78,7 +78,7 @@ looked up in the graph regardless of which mode answered.
 
 - **Backend:** Python, FastAPI, SQLite, an in-memory graph engine, Groq + Sarvam APIs
 - **Mobile:** Expo / React Native, expo-router, Zustand, react-native-maps
-- **Web / On-device:** Vanilla JS PWA, service worker, **WebLLM** (WebGPU), Leaflet
+- **Web:** Vanilla JS PWA, service worker, Leaflet
 - **Data:** compiled JSON knowledge graph + additive patch store
 
 ## Repository structure
@@ -91,17 +91,14 @@ backend/                 FastAPI app, graph engine, resolver, chatbot, offline e
   dynamic_chatbot.py     LLM narrate flow (Cloud AI)
   offline_engine.py      rule-based fallback (no LLM)
   gov_scraper.py + patch_engine.py + update_orchestrator.py   law-update pipeline
-apps/mobile/             Expo React Native app (Calculator · AI Chat · On-device)
-  src/offline/           TypeScript port of the resolver + graph + on-device SLM seam
-apps/web/                PWA
-  slm.html               On-device AI mode (WebLLM, offline, graph-grounded)
+apps/mobile/             Expo / React Native app — native AND the PWA (npm run build:web → dist/, served at /)
+  src/offline/           TypeScript port of the resolver + graph (rule-based offline engine)
+apps/web/                original single-file PWA (kept at /classic)
   offline.bundle.js      bundled offline engine
-  drivelegal_cities.json GPS/map/city dataset
-  webllm.bundle.js       self-hosted WebLLM loader (offline-safe)
   sw.js                  service worker (precaches app + engine)
 data/compiled/           drivelegal_graph.json — the knowledge graph
-scripts/                 build_offline_bundle.py, build_cities.py, setup helpers
-docs/                    architecture notes, offline-AI guide
+scripts/                 build_offline_bundle.py, eval + verify helpers
+docs/                    architecture notes, scenario engine, eval guide
 ```
 
 ## Getting started
@@ -123,19 +120,15 @@ npm install
 # point the app at your machine's LAN IP so a physical phone can reach the backend
 EXPO_PUBLIC_API_BASE_URL="http://<YOUR_LAN_IP>:8000" npx expo start
 ```
-Scan the QR with **Expo Go**. Use the home-screen toggle: **Calculator · AI Chat ·
-On-device**.
+Scan the QR with **Expo Go**. Use the home-screen toggle: **Calculator · AI Chat**.
 
-### 3. PWA / On-device AI
+### 3. PWA
 
-Serve `apps/web/` over **HTTPS** (WebGPU requires a secure context) — e.g. drag the
-folder onto [Netlify Drop](https://app.netlify.com/drop). Open `…/slm.html`. First load
-downloads a small model once, then it runs fully offline.
+Serve `apps/web/` (the backend does this at `http://localhost:8000/`).
 
 Regenerate the offline datasets after changing the graph:
 ```bash
 python3 scripts/build_offline_bundle.py   # → apps/mobile/src/offline/drivelegal_offline.json
-python3 scripts/build_cities.py           # → apps/web/drivelegal_cities.json
 ```
 
 ## Environment variables
@@ -155,9 +148,8 @@ Copy `.env.example` → `.env` (git-ignored) and set:
 
 The knowledge graph and resolver are pure functions, so they were ported to TypeScript
 and bundled for the client (`apps/mobile/src/offline/`, `apps/web/offline.bundle.js`).
-The service worker precaches the app shell, the offline engine, and the WebLLM loader;
-WebLLM caches the model weights in the browser. Result: after one online visit, the
-whole experience — including a running LLM — works with the network off.
+The service worker precaches the app shell and the offline engine. After one online visit the
+rule-based experience (Calculator and chat fallback) works with the network off; AI Chat needs the cloud.
 
 ## Tested conversation quality
 

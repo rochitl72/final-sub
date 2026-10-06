@@ -32,7 +32,6 @@ import {
   StatusBar,
   ActivityIndicator,
   Dimensions,
-  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -52,18 +51,16 @@ import { FALLBACK_TOAST, useAiConnectivity } from '../hooks/useAiConnectivity';
 import { setPreferRulesMode } from '../services/api';
 import { localTurn, shouldAnswerLocally } from '../offline';
 import { translate } from '../services/sarvamApi';
+import { useDesktop } from '../hooks/useDesktop';
 import type { Language } from '../services/sarvamApi';
 
 const { height: H } = Dimensions.get('window');
-
-// Mode 3 — On-device AI runs in the PWA (WebLLM needs the browser's WebGPU).
-// Tapping the chip opens it in the phone's real browser.
-const SLM_URL = 'https://drivelegal-ai-r72.netlify.app';
 
 // ── Main Chat Screen ──────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
   const router = useRouter();
+  const desktop = useDesktop();
   const params = useLocalSearchParams<{ sessionId: string; mode?: string }>();
   const sessionId = params.sessionId;
 
@@ -105,6 +102,9 @@ export default function ChatScreen() {
 
   const isOnline       = aiConnectivity.cloudFeaturesEnabled;
   const sarvamAvailable = aiConnectivity.sarvamAvailable;
+  // Translation runs on the backend (Sarvam, else Groq), so it only needs the
+  // server — not cloud AI mode. Rules mode can be translated too.
+  const canTranslate    = aiConnectivity.serverReachable;
 
   useEffect(() => {
     setPreferRulesMode(aiConnectivity.effectiveMode === 'rules');
@@ -121,27 +121,32 @@ export default function ChatScreen() {
     if (targetLang === 'en-IN' || !text.trim()) return;
     updateMessage(msgId, { isTranslating: true });
     const translated = await translate(text, targetLang);
-    updateMessage(msgId, { translatedContent: translated, isTranslating: false });
+    // translate() returns the original text on failure — don't badge that as
+    // "translated".
+    updateMessage(msgId, {
+      translatedContent: translated && translated !== text ? translated : undefined,
+      isTranslating: false,
+    });
   }, [updateMessage]);
 
   // ── Sarvam: auto-translate latest assistant message whenever messages change
 
   const lastAutoTranslatedId = useRef<string | null>(null);
   useEffect(() => {
-    if (!isOnline || language.code === 'en-IN') return;
+    if (!canTranslate || language.code === 'en-IN') return;
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== 'assistant' || lastMsg.pending) return;
     if (lastMsg.id === lastAutoTranslatedId.current) return;
     if (lastMsg.translatedContent || lastMsg.isTranslating) return;
     lastAutoTranslatedId.current = lastMsg.id;
     translateMessage(lastMsg.id, lastMsg.content, language.code);
-  }, [messages, isOnline, language.code, translateMessage]);
+  }, [messages, canTranslate, language.code, translateMessage]);
 
   // ── Sarvam: progressive re-translation on language change ────────────────
 
   const retranslateAllRef = useRef(false);
-  const isOnlineRef = useRef(isOnline);
-  useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
+  const isOnlineRef = useRef(canTranslate);
+  useEffect(() => { isOnlineRef.current = canTranslate; }, [canTranslate]);
 
   const retranslateAll = useCallback(async (targetLang: string) => {
     // Clear translations when switching back to English
@@ -208,6 +213,7 @@ export default function ChatScreen() {
         selection_mode: m.payload?.selection_mode,
         allow_other:    m.payload?.allow_other,
         fine_card:      m.payload?.fine_card,
+        scenario:       m.payload?.scenario,
         detail_table: m.payload?.detail_table,
         explanation:  m.payload?.explanation,
         allow_text:   m.payload?.allow_text,
@@ -458,13 +464,15 @@ export default function ChatScreen() {
       keyboardVerticalOffset={0}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <LinearGradient colors={Gradients.navyDeep} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={Gradients.navyDeep} style={StyleSheet.absoluteFill} />
 
       {/* ── Header ───────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.white} />
-        </TouchableOpacity>
+        {!desktop && (
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={Colors.white} />
+          </TouchableOpacity>
+        )}
 
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -509,7 +517,7 @@ export default function ChatScreen() {
         <View style={styles.headerActions}>
           {/* 🌐 Language selector (Sarvam — online only) */}
           <LanguageTrigger
-            isOnline={isOnline}
+            isOnline={canTranslate}
             onLanguageChange={handleLanguageChange}
           />
 
@@ -523,15 +531,6 @@ export default function ChatScreen() {
               size={18}
               color={hasState ? Colors.bluePale : Colors.gray}
             />
-          </TouchableOpacity>
-
-          {/* Mode 3 — On-device AI (opens the offline WebLLM PWA in the browser) */}
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={() => { showToast('🧠 Opening On-device AI…'); Linking.openURL(SLM_URL); }}
-            accessibilityLabel="Open On-device AI"
-          >
-            <Ionicons name="hardware-chip-outline" size={18} color={Colors.accent} />
           </TouchableOpacity>
 
           {/* Mode toggle */}
@@ -579,7 +578,7 @@ export default function ChatScreen() {
           style={styles.locBanner}
           onPress={() => { setLocModalTab('gps'); setShowLocModal(true); }}
         >
-          <LinearGradient colors={['rgba(26,79,168,0.3)', 'rgba(15,32,64,0.3)']} style={StyleSheet.absoluteFillObject} />
+          <LinearGradient colors={['rgba(26,79,168,0.3)', 'rgba(15,32,64,0.3)']} style={StyleSheet.absoluteFill} />
           <Ionicons name="location" size={15} color={Colors.bluePale} />
           <Text style={styles.locBannerText}>Tap to set your location to get started</Text>
         </TouchableOpacity>
@@ -589,47 +588,54 @@ export default function ChatScreen() {
       <View style={styles.inputArea}>
         <LinearGradient
           colors={['rgba(10,22,40,0.98)', 'rgba(5,13,31,1)']}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
         {/* Top border glow */}
         <View style={styles.inputTopBorder} />
 
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, !allowText && styles.inputDisabled]}
-            placeholder={
-              !allowText
-                ? 'Tap a chip above to continue…'
-                : currentMode === 'dynamic'
-                ? 'Ask anything about traffic law…'
-                : 'Type a message…'
-            }
-            placeholderTextColor={Colors.grayDark}
-            value={inputText}
-            onChangeText={setInputText}
-            onSubmitEditing={() => handleSend()}
-            returnKeyType="send"
-            editable={allowText && !isSending}
-            multiline
-            maxLength={2000}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              (!inputText.trim() || isSending || !allowText) && styles.sendBtnDisabled,
-            ]}
-            onPress={() => handleSend()}
-            disabled={!inputText.trim() || isSending || !allowText}
-          >
-            {isSending ? (
-              <ActivityIndicator color={Colors.white} size="small" />
-            ) : (
-              <LinearGradient colors={Gradients.blueGloss} style={styles.sendBtnGrad}>
-                <Ionicons name="arrow-up" size={22} color={Colors.white} />
-              </LinearGradient>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Calculator is chip-driven — the message bar only appears in AI Chat */}
+        {currentMode === 'dynamic' && (
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, !allowText && styles.inputDisabled]}
+              placeholder={
+                !allowText
+                  ? 'Tap a chip above to continue…'
+                  : currentMode === 'dynamic'
+                  ? 'Ask anything about traffic law…'
+                  : 'Type a message…'
+              }
+              placeholderTextColor={Colors.grayDark}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={() => handleSend()}
+              // Web: Enter sends, Shift+Enter adds a new line (multiline inputs ignore onSubmitEditing there).
+              onKeyPress={Platform.OS === 'web' ? (e: any) => {
+                if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) { e.preventDefault?.(); handleSend(); }
+              } : undefined}
+              returnKeyType="send"
+              editable={allowText && !isSending}
+              multiline
+              maxLength={2000}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendBtn,
+                (!inputText.trim() || isSending || !allowText) && styles.sendBtnDisabled,
+              ]}
+              onPress={() => handleSend()}
+              disabled={!inputText.trim() || isSending || !allowText}
+            >
+              {isSending ? (
+                <ActivityIndicator color={Colors.white} size="small" />
+              ) : (
+                <LinearGradient colors={Gradients.blueGloss} style={styles.sendBtnGrad}>
+                  <Ionicons name="arrow-up" size={22} color={Colors.white} />
+                </LinearGradient>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {hasState && (
           <View style={styles.locFooterRow}>
@@ -675,7 +681,7 @@ export default function ChatScreen() {
         >
           <LinearGradient
             colors={['rgba(8,18,45,0.96)', 'rgba(4,10,24,0.98)']}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
           <View style={styles.toastBorder} />
           <View style={styles.toastRow}>

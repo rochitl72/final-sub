@@ -1834,8 +1834,9 @@ def _pre_route(session: dict, text: str, eng, *, calculator: bool = False) -> Op
             loc = session.get("city_name") or session.get("state_code")
             reply = (f"You've described **{len(cards)} separate offences** in {loc}:\n\n"
                      + "\n".join(parts)
-                     + f"\n\nTogether that's **{nlu._fmt(total)}** if both are first offences. "
-                       "Ask me about either one for details (e.g. 'is the licence one compoundable?').")
+                     + f"\n\nTogether that's **{nlu._fmt(total)}** if "
+                       + ("both are" if len(cards) == 2 else "all are") + " first offences. "
+                       "Ask me about any of them for details (e.g. 'is the first one compoundable?').")
             session["violation_code"] = cards[0]["violation_code"]
             session["last_fine_card"] = cards[0]
             session["stage"] = "answered"
@@ -1970,6 +1971,17 @@ def extract_and_reply(
         if scoped.get("slot"):
             session["pending_slot"] = scoped["slot"]
         return scoped
+
+    # ── Scenario Engine: multi-person / multi-offence / incident stories ─────
+    # (also answers its own clarifying question and folds in corrections).
+    try:
+        from scenario import maybe_handle as _scenario_turn
+        sc = _scenario_turn(session, text)
+    except Exception:
+        logging.getLogger("drivelegal.scenario").exception("scenario engine failed")
+        sc = None
+    if sc is not None:
+        return sc
 
     # ── Deterministic understanding layer (nlu.py) ───────────────────────────
     pre = _pre_route(session, text, eng)

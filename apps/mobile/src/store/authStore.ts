@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import { secureStorage as SecureStore } from '../services/secureStorage';
 import { authApi, setAuthToken, User } from '../services/api';
 
 const TOKEN_KEY    = 'drivelegal_jwt';

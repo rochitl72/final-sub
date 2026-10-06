@@ -20,6 +20,7 @@ export interface ChatMessage {
   selection_mode?: 'single' | 'multi';
   allow_other?:  boolean;
   fine_card?:   FineCard;
+  scenario?:    any;      // multi-person breakdown from the Scenario Engine
   detail_table?: DetailRow[];
   explanation?: Explanation;
   allow_text?:  boolean;
@@ -104,7 +105,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const {
       session_state, reply, question, chips, multi_select,
       selection_mode, allow_other,
-      fine_card, detail_table, explanation, allow_text, intent, slot,
+      fine_card, detail_table, explanation, allow_text, intent, slot, scenario,
     } = resp;
     const content = reply || question || '';
     // Skip empty no-op turns so we don't render blank bubbles.
@@ -118,6 +119,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         selection_mode: selection_mode,
         allow_other:    allow_other,
         fine_card:      fine_card,
+        scenario:       scenario,
         detail_table:   detail_table,
         explanation:    explanation,
         allow_text:     allow_text,

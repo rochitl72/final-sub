@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import time
 from typing import Optional
 
 import httpx
@@ -63,6 +65,30 @@ def _require_api_key() -> None:
         raise SarvamOfflineError(
             "SARVAM_API_KEY not set — add it to .env in the repo root and restart"
         )
+    if _quota_blocked():
+        raise SarvamOfflineError("Sarvam account has no credits left")
+
+
+# A key can be valid but out of credits (HTTP 4xx "insufficient_quota_error").
+# Remember that for a while so /api/health reports sarvam_ok=false and callers
+# fall back (Groq translation, browser speech) instead of failing every request.
+_QUOTA_BACKOFF_S = 30 * 60
+_quota_until: float = 0.0
+_probed: bool = False
+
+
+def _quota_blocked() -> bool:
+    return time.time() < _quota_until
+
+
+def _raise_for_quota(resp: "httpx.Response", what: str) -> None:
+    global _quota_until
+    body = resp.text[:400]
+    if resp.status_code in (402, 403) or "insufficient_quota" in body or "No credits" in body:
+        _quota_until = time.time() + _QUOTA_BACKOFF_S
+        log.warning("Sarvam %s: no credits on this key — disabling Sarvam for %d min",
+                    what, _QUOTA_BACKOFF_S // 60)
+        raise SarvamOfflineError("Sarvam account has no credits left")
 
 
 # ── 1. Text-to-Speech ─────────────────────────────────────────────────────────
@@ -110,6 +136,7 @@ def synthesize_speech(
     except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
         raise SarvamOfflineError(f"TTS unreachable: {e}") from e
 
+    _raise_for_quota(resp, "TTS")
     if resp.status_code == 401:
         raise SarvamOfflineError("TTS: invalid API key")
     if resp.status_code == 429:
@@ -137,12 +164,12 @@ def synthesize_speech(
 
 # ── 3. Translation ────────────────────────────────────────────────────────────
 
-def translate_text(
+def _translate_one(
     text: str,
     target_language_code: str,
     source_language_code: str = "en-IN",
     *,
-    mode: str = "modern-colloquial",
+    mode: str = "classic-colloquial",
 ) -> str:
     """
     Translate text using Mayura v1.
@@ -154,6 +181,16 @@ def translate_text(
         return text
 
     _require_api_key()
+    # Mayura treats the full stop in "s.194D" as a sentence break and mangles
+    # the section number; spell it out so the reference survives translation.
+    text = re.sub(r"\bs\.\s?(?=\d)", "Section ", text)
+    text = re.sub(r"\bss\.\s?(?=\d)", "Sections ", text)
+    # "Fine ₹1,000" is read as the adjective ("okay") → ठीक है / சரி; "penalty"
+    # translates correctly.
+    text = re.sub(r"\bFines\b", "Penalties", text)
+    text = re.sub(r"\bfines\b", "penalties", text)
+    text = re.sub(r"\bFine\b(?=[:\s]*[₹\d])", "Penalty", text)
+    text = re.sub(r"\bfine\b(?=[:\s]*(?:of\s+)?[₹\d])", "penalty", text)
     try:
         resp = httpx.post(
             SARVAM_TRL_URL,
@@ -170,13 +207,16 @@ def translate_text(
     except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
         raise SarvamOfflineError(f"Translate unreachable: {e}") from e
 
+    _raise_for_quota(resp, "translate")
     if resp.status_code == 401:
         raise SarvamOfflineError("Translate: invalid API key")
     if resp.status_code == 429:
         raise SarvamOfflineError("Translate rate limited")
     if resp.status_code != 200:
+        # Never return the English text as if it were a translation — let the
+        # caller fall back to another translator.
         log.warning("Translate error %d: %s", resp.status_code, resp.text[:200])
-        return text
+        raise SarvamOfflineError(f"Translate error {resp.status_code}")
 
     translated = resp.json().get("translated_text", text)
     log.info("Translate OK: %s→%s", source_language_code, target_language_code)
@@ -190,7 +230,7 @@ def chat_complete(
     *,
     max_tokens:  int   = 300,
     temperature: float = 0.4,
-    model: str         = "sarvam-30b",   # sarvam-m deprecated Jul-2026 → use sarvam-30b
+    model: str         = "sarvam-105b",  # sarvam-m / sarvam-30b deprecated → sarvam-105b
 ) -> str:
     """
     Chat completion using Sarvam (India-trained, OpenAI-compatible).
@@ -212,6 +252,7 @@ def chat_complete(
     except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
         raise SarvamOfflineError(f"Sarvam LLM unreachable: {e}") from e
 
+    _raise_for_quota(resp, "LLM")
     if resp.status_code == 401:
         raise SarvamOfflineError("Sarvam LLM: invalid API key")
     if resp.status_code == 429:
@@ -229,9 +270,23 @@ def check_sarvam_status() -> bool:
     Returns True only when BOTH the API key is set AND Sarvam is reachable.
     Used by /api/health to determine cloudFeaturesEnabled on the mobile.
     """
+    global _probed
     if not _api_key():
         log.debug("check_sarvam_status: no API key")
         return False
+    if _quota_blocked():
+        return False
+    if not _probed:
+        # One real (tiny) call per process: catches a bad key or an account with
+        # no credits, which a bare reachability GET can't see.
+        _probed = True
+        try:
+            translate_text("ok", "hi-IN")
+        except SarvamOfflineError as e:
+            log.warning("Sarvam disabled: %s", e)
+            return False
+        except Exception:
+            pass
     try:
         # Lightweight GET — just checks network reachability
         resp = httpx.get(SARVAM_BASE, timeout=4.0)
@@ -239,3 +294,39 @@ def check_sarvam_status() -> bool:
     except Exception as e:
         log.debug("check_sarvam_status: unreachable (%s)", e)
         return False
+
+
+_BULLET_RE = re.compile(r"^(\s*(?:[•\-*]|\d+[.)])\s+)(.*)$")
+
+
+def translate_text(
+    text: str,
+    target_language_code: str,
+    source_language_code: str = "en-IN",
+    *,
+    mode: str = "classic-colloquial",
+) -> str:
+    """Translate keeping the answer's layout. Sarvam's /translate collapses line
+    breaks and bullets, so translate line by line (in parallel) and re-join."""
+    if "\n" not in text.strip():
+        return _translate_one(text, target_language_code, source_language_code, mode=mode)
+    from concurrent.futures import ThreadPoolExecutor
+
+    lines = text.split("\n")
+    jobs: dict[int, tuple[str, str]] = {}
+    for i, ln in enumerate(lines):
+        if not ln.strip():
+            continue
+        m = _BULLET_RE.match(ln)
+        prefix, body = (m.group(1), m.group(2)) if m else ("", ln)
+        jobs[i] = (prefix, body)
+
+    def run(item):
+        i, (_, body) = item
+        return i, _translate_one(body, target_language_code, source_language_code, mode=mode)
+
+    out = list(lines)
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        for i, tr in ex.map(run, jobs.items()):
+            out[i] = jobs[i][0] + tr
+    return "\n".join(out)

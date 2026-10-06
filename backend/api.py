@@ -27,6 +27,7 @@ into the SQLite store (`backend/data/chats.db`). The in-memory
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import sys
@@ -57,6 +58,7 @@ if _ENV_FILE.exists():
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -138,6 +140,7 @@ _cors_origins = (
     else [o.strip() for o in _cors_env.split(",") if o.strip()]
 )
 
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -148,7 +151,11 @@ app.add_middleware(
 # Mount auth routes
 app.include_router(auth_router)
 
-_FRONTEND = _HERE.parent / "apps" / "web"
+_LEGACY_WEB = _HERE.parent / "apps" / "web"
+_DESKTOP = _HERE.parent / "apps" / "mobile" / "dist"   # Expo web export of the mobile app (the PWA)
+# The mobile app's web export (apps/mobile: `npx expo export -p web`) is the main site when built; the original
+# single-file PWA stays available at /classic.
+_FRONTEND = _DESKTOP if (_DESKTOP / "index.html").exists() else _LEGACY_WEB
 _VIZ_HTML = _HERE.parent / "docs" / "visualizations" / "drivelegal_graph_3d.html"
 
 DEFAULT_STATE_CODE = os.getenv("DRIVELEGAL_DEFAULT_STATE", "KA")
@@ -334,6 +341,7 @@ def _persist_turn_out(sid: str, out: dict, s: dict) -> None:
         "previous_fine_card": out.get("previous_fine_card"),
         "diff":               out.get("diff"),
         "mode":               out.get("mode"),
+        "scenario":           out.get("scenario"),
     }
     # Strip null fields so the JSON stays compact.
     payload = {k: v for k, v in payload.items() if v is not None}
@@ -347,7 +355,7 @@ def _persist_turn_out(sid: str, out: dict, s: dict) -> None:
     new_title: Optional[str] = None
     # Title-trigger intents: explicit calculator answer, smart-relocation
     # update, or a narrate-phase reply that ends up attaching a fine card.
-    if intent in ("answer", "answer_updated") or (
+    if intent in ("answer", "answer_updated", "scenario", "scenario_update") or (
         intent == "narrate" and out.get("fine_card")
     ):
         new_title = derive_title(summary) or None
@@ -367,6 +375,15 @@ def _persist_user_event(sid: str, event: str, payload: Optional[dict] = None) ->
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+
+
+@app.middleware("http")
+async def _pwa_cache_headers(request, call_next):
+    """Service worker + shell must always be revalidated so a new deploy reaches installed PWAs."""
+    resp = await call_next(request)
+    if request.url.path in ("/", "/index.html", "/sw.js", "/manifest.webmanifest") or request.url.path.startswith("/workbox-"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @app.get("/")
@@ -649,7 +666,7 @@ class SarvamTranslateBody(BaseModel):
     text:            str
     target_language: str            # BCP-47 e.g. "hi-IN"
     source_language: str = "en-IN"
-    mode:            str = "modern-colloquial"
+    mode:            str = "classic-colloquial"
 
 
 class SarvamTTSBody(BaseModel):
@@ -662,22 +679,36 @@ class SarvamTTSBody(BaseModel):
 async def sarvam_translate(body: SarvamTranslateBody):
     """Translate text using Mayura v1 (11 Indian languages)."""
     try:
-        translated = translate_text(
+        translated = await asyncio.to_thread(
+            translate_text,
             body.text,
             body.target_language,
             source_language_code = body.source_language,
             mode                 = body.mode,
         )
-        return {"translated": translated, "target_language": body.target_language}
+        return {"translated": translated, "target_language": body.target_language,
+                "engine": "sarvam"}
     except SarvamOfflineError as e:
-        raise HTTPException(status_code=503, detail=f"Sarvam offline: {e}")
+        sarvam_err = e
+    # Fallback: translate with the Groq LLM so the language picker still works
+    # without Sarvam credits.
+    try:
+        from llm_chatbot import groq_translate
+        translated = await asyncio.to_thread(
+            groq_translate, body.text, body.target_language, body.source_language)
+        return {"translated": translated, "target_language": body.target_language,
+                "engine": "groq"}
+    except Exception as e:
+        raise HTTPException(status_code=503,
+                            detail=f"Translation unavailable (Sarvam: {sarvam_err}; Groq: {e})")
 
 
 @app.post("/api/sarvam/tts")
 async def sarvam_tts(body: SarvamTTSBody):
     """Convert text to speech using Bulbul v3. Returns base64 WAV."""
     try:
-        audio_b64 = synthesize_speech(
+        audio_b64 = await asyncio.to_thread(
+            synthesize_speech,
             body.text,
             body.language_code,
             pace = body.pace,
@@ -698,8 +729,23 @@ async def knowledge_graph_viz():
 
 
 # ── Static frontend (mounted last so /api/* still wins) ──────────────────────
+if _FRONTEND is _DESKTOP and _LEGACY_WEB.exists():
+    app.mount("/classic", StaticFiles(directory=str(_LEGACY_WEB), html=True), name="classic")
+class _SPAStatic(StaticFiles):
+    """Static files with a single-page-app fallback: unknown paths (e.g. /chat?sessionId=…) get index.html,
+    so reloading a deep link in the PWA works."""
+    async def get_response(self, path, scope):
+        try:
+            return await super().get_response(path, scope)
+        except Exception as exc:          # starlette raises HTTPException(404) for missing files
+            if getattr(exc, "status_code", None) == 404 and "." not in path.rsplit("/", 1)[-1] \
+                    and not path.lstrip("/").startswith(("api/", "auth/", "docs", "openapi", "viz", "classic")):
+                return await super().get_response("index.html", scope)
+            raise
+
+
 if _FRONTEND.exists():
-    app.mount("/", StaticFiles(directory=str(_FRONTEND), html=True), name="frontend")
+    app.mount("/", _SPAStatic(directory=str(_FRONTEND), html=True), name="frontend")
 
 
 if __name__ == "__main__":

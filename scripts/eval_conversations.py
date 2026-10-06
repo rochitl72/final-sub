@@ -184,7 +184,7 @@ SCENARIOS: List[S] = [
     ], modes=["dynamic"]),
     S("C1b_multi_followup", [
         T("no helmet and no licence while riding my bike", vc_in=["SAFETY_NO_HELMET_RIDER", "DOC_NO_DL"],
-          has=[r"(?i)2 separate offences"]),
+          has=[r"(?i)rider not wearing helmet", r"(?i)without valid driving licence", r"(?i)total if first offences|together that's"]),
         T("is the licence one compoundable?", vc="DOC_NO_DL", has=[r"(?i)not compoundable"]),
     ], modes=["dynamic", "static"]),
     S("C3_static_switch", [

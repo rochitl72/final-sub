@@ -16,6 +16,7 @@ import { FineCard } from './FineCard';
 import { MultiSelect } from './MultiSelect';
 import { Logo } from './Brand';
 import { TtsButton } from './TtsButton';
+import { ScenarioCards } from './ScenarioCards';
 
 interface Props {
   message:          ChatMessage;
@@ -84,6 +85,9 @@ export function ChatBubble({ message, onChipPress, onMultiSubmit, onMcqProceed, 
   const hasChips    = !!(message.chips?.length);
   // Show translated text when available, fall back to original
   const displayText = message.translatedContent ?? message.content;
+  const sc = message.scenario;
+  const structured = !isUser && !message.translatedContent && !!(sc?.people?.length) && sc.head != null;
+  const shownText = structured ? (sc.head || '') : displayText;
 
   // Every assistant chip list is a vertical checkbox MCQ — never horizontal pills.
   const showMcq = hasChips && !isUser;
@@ -110,7 +114,7 @@ export function ChatBubble({ message, onChipPress, onMultiSubmit, onMcqProceed, 
                 colors={Gradients.userBubble}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
               />
             ) : null}
             {isPending ? (
@@ -118,7 +122,7 @@ export function ChatBubble({ message, onChipPress, onMultiSubmit, onMcqProceed, 
             ) : (
               <>
                 <RichText
-                  text={displayText}
+                  text={shownText}
                   style={[styles.bubbleText, isUser && styles.bubbleTextUser]}
                   boldStyle={styles.bubbleTextBold}
                 />
@@ -159,7 +163,14 @@ export function ChatBubble({ message, onChipPress, onMultiSubmit, onMcqProceed, 
           />
         )}
 
-        {hasFineCard && (
+        {structured && <ScenarioCards scenario={sc} />}
+        {structured && !!sc.tail && (
+          <View style={[styles.bubble, styles.bubbleAssistant, { marginTop: 8 }]}>
+            <RichText text={sc.tail} style={styles.bubbleText} boldStyle={styles.bubbleTextBold} />
+          </View>
+        )}
+
+        {hasFineCard && !structured && (
           <FineCard card={message.fine_card!} detailTable={message.detail_table} />
         )}
       </View>

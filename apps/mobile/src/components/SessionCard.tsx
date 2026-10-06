@@ -80,7 +80,7 @@ export function SessionCard({ session, isActive, onPress, onDelete }: Props) {
             </Text>
             {!!session.last_snippet && (
               <Text style={styles.snippet} numberOfLines={1}>
-                {session.last_snippet}
+                {session.last_snippet.replace(/\*\*/g, '')}
               </Text>
             )}
             <View style={styles.metaRow}>

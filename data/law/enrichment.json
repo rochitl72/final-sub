@@ -1,0 +1,1947 @@
+{
+ "_about": "Reasoning layer for the Scenario Engine: who is liable, which facts make an offence apply, how offences relate, and the criminal-law (BNS) layer for injury and death. Applied to data/drivelegal.db by scripts/apply_law_enrichment.py (idempotent). Every row cites a source key; amounts and terms must be re-verified against India Code before production use.",
+ "version": 2,
+ "sources": [
+  {
+   "key": "mva",
+   "title": "Motor Vehicles Act, 1988 (as amended by the MV (Amendment) Act, 2019)",
+   "url": "https://www.indiacode.nic.in",
+   "note": "Central penalties; states may compound at lower amounts."
+  },
+  {
+   "key": "bns",
+   "title": "Bharatiya Nyaya Sanhita, 2023",
+   "url": "https://www.indiacode.nic.in",
+   "note": "In force from 1 July 2024 except section 106(2), which was kept in abeyance."
+  },
+  {
+   "key": "cmvr",
+   "title": "Central Motor Vehicles Rules, 1989",
+   "url": "https://www.indiacode.nic.in",
+   "note": "Equipment and conduct rules; penalty under MV Act s.177 unless specified."
+  }
+ ],
+ "provisions": [
+  {
+   "act": "MV Act 1988",
+   "section": "134",
+   "title": "Duty of driver in case of accident and injury",
+   "summary": "Driver must secure medical attention for the injured and report the accident to police within 24 hours.",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "161",
+   "title": "Compensation in hit-and-run cases",
+   "summary": "Victims of hit-and-run get fixed compensation from the Motor Vehicle Accident Fund: ₹2,00,000 for death, ₹50,000 for grievous hurt. Claim through the district claims enquiry officer.",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "177",
+   "title": "General penalty",
+   "summary": "Contravention with no specific penalty: fine up to ₹500; repeat up to ₹1,500.",
+   "max_fine": 1500,
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "180",
+   "title": "Allowing unauthorised persons to drive",
+   "summary": "Owner or person in charge who lets someone without a valid licence drive: up to 3 months, or fine up to ₹5,000, or both.",
+   "max_fine": 5000,
+   "max_jail": "up to 3 months",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "181",
+   "title": "Driving without licence / underage",
+   "summary": "Driving without a licence or below the minimum age: up to 3 months, or fine up to ₹5,000, or both.",
+   "max_fine": 5000,
+   "max_jail": "up to 3 months",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "184",
+   "title": "Driving dangerously",
+   "summary": "First offence: 6 months to 1 year, or fine ₹1,000–5,000, or both. Repeat within 3 years: up to 2 years, or fine up to ₹10,000, or both.",
+   "max_fine": 10000,
+   "max_jail": "up to 2 years (repeat)",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "185",
+   "title": "Driving by a drunken person or under drugs",
+   "summary": "First offence: up to 6 months, or fine up to ₹10,000, or both. Repeat within 3 years: up to 2 years, or fine up to ₹15,000, or both.",
+   "max_fine": 15000,
+   "max_jail": "up to 2 years (repeat)",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "187",
+   "title": "Offences relating to accident",
+   "summary": "Failing to stop, help or report under s.132/133/134: up to 6 months, or fine up to ₹5,000, or both.",
+   "max_fine": 5000,
+   "max_jail": "up to 6 months",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "194",
+   "title": "Driving vehicle exceeding permissible weight",
+   "summary": "Whoever drives or causes or allows an overloaded goods vehicle: ₹20,000 plus ₹2,000 per extra tonne; the excess load must be offloaded.",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "194A",
+   "title": "Carriage of excess passengers",
+   "summary": "Whoever drives or causes or allows a transport vehicle to carry excess passengers: ₹200 per extra passenger.",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "194B",
+   "title": "Safety belts and child restraints",
+   "summary": "Driving without a seat belt or carrying passengers not wearing seat belts: ₹1,000. Child under 14 not secured: ₹1,000.",
+   "max_fine": 1000,
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "194C",
+   "title": "Overloading of two-wheelers",
+   "summary": "More than one pillion: ₹1,000 and licence disqualification for 3 months.",
+   "max_fine": 1000,
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "194D",
+   "title": "Protective headgear",
+   "summary": "Rider or pillion without a helmet: ₹1,000 and licence disqualification for 3 months.",
+   "max_fine": 1000,
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "196",
+   "title": "Driving uninsured vehicle",
+   "summary": "Whoever drives or causes or allows an uninsured vehicle: up to 3 months, or ₹2,000, or both; repeat ₹4,000.",
+   "max_fine": 4000,
+   "max_jail": "up to 3 months",
+   "source": "mva"
+  },
+  {
+   "act": "MV Act 1988",
+   "section": "199A",
+   "title": "Offences by juveniles",
+   "summary": "When a juvenile commits an offence, the guardian or owner is deemed guilty: up to 3 years and ₹25,000. Registration cancelled for 12 months; the juvenile cannot get a licence until 25. The juvenile is dealt with under the Juvenile Justice Act.",
+   "max_fine": 25000,
+   "max_jail": "up to 3 years",
+   "source": "mva"
+  },
+  {
+   "act": "BNS 2023",
+   "section": "106(1)",
+   "title": "Causing death by negligence",
+   "summary": "Causing death by a rash or negligent act: up to 5 years and fine.",
+   "max_jail": "up to 5 years",
+   "source": "bns"
+  },
+  {
+   "act": "BNS 2023",
+   "section": "106(2)",
+   "title": "Death by rash driving and escaping",
+   "summary": "Causing death by rash or negligent driving and escaping without reporting: up to 10 years and fine. Not yet in force (kept in abeyance).",
+   "max_jail": "up to 10 years",
+   "note": "Not notified as of the 1 July 2024 commencement.",
+   "source": "bns"
+  },
+  {
+   "act": "BNS 2023",
+   "section": "125",
+   "title": "Act endangering life or personal safety",
+   "summary": "Rash or negligent act endangering life: up to 3 months or ₹2,500. Causing hurt: up to 6 months or ₹5,000. Causing grievous hurt: up to 3 years or ₹10,000.",
+   "max_fine": 10000,
+   "max_jail": "up to 3 years (grievous hurt)",
+   "source": "bns"
+  },
+  {
+   "act": "BNS 2023",
+   "section": "281",
+   "title": "Rash driving on a public way",
+   "summary": "Driving so rashly or negligently as to endanger human life: up to 6 months, or fine up to ₹1,000, or both.",
+   "max_fine": 1000,
+   "max_jail": "up to 6 months",
+   "source": "bns"
+  }
+ ],
+ "new_violations": [
+  {
+   "code": "CRIM_HURT_RASH_NEGLIGENT",
+   "name": "Causing hurt by rash or negligent driving",
+   "grp": "accident_and_emergency",
+   "mv_section": "BNS 125(a)/(b)",
+   "description": "Rash or negligent driving that injures another person. Hurt and grievous hurt carry different terms.",
+   "compoundable": false,
+   "what_to_do_next": "Get the injured person medical help, report to police within 24 hours (MV Act s.134), and consult a lawyer; this is a criminal case decided by a court.",
+   "tips_to_avoid": "Drive within limits and keep a safe distance, especially near two-wheelers and pedestrians.",
+   "officer_action": "FIR registered; vehicle may be seized for inspection.",
+   "evidence_req": "Medical report, scene photos, witness statements.",
+   "severity": "criminal",
+   "road_buckets": [
+    "highway",
+    "main_road",
+    "street"
+   ],
+   "keywords": [],
+   "penalty": {
+    "first_offence": 5000,
+    "imprisonment": "hurt: up to 6 months or fine up to ₹5,000; grievous hurt: up to 3 years or fine up to ₹10,000 (court decides)",
+    "note": "BNS 125(a)/(b)"
+   },
+   "provisions": [
+    [
+     "BNS 2023",
+     "125",
+     "primary"
+    ]
+   ]
+  },
+  {
+   "code": "CRIM_RASH_DRIVING_PUBLIC_WAY",
+   "name": "Rash driving on a public way (criminal)",
+   "grp": "dangerous_driving",
+   "mv_section": "BNS 281",
+   "description": "Driving so rashly or negligently that human life is endangered; charged alongside MV Act s.184 when people were put at risk.",
+   "compoundable": false,
+   "what_to_do_next": "This is a criminal charge decided by a court; keep the challan/FIR copy and consult a lawyer.",
+   "tips_to_avoid": "No racing, stunts or weaving through traffic on public roads.",
+   "officer_action": "FIR may be registered in addition to the MV Act challan.",
+   "evidence_req": "Video, witness statements, damage or injury evidence.",
+   "severity": "criminal",
+   "road_buckets": [
+    "highway",
+    "main_road",
+    "street"
+   ],
+   "keywords": [],
+   "penalty": {
+    "first_offence": 1000,
+    "imprisonment": "up to 6 months, or fine up to ₹1,000, or both (court decides)",
+    "note": "BNS 281"
+   },
+   "provisions": [
+    [
+     "BNS 2023",
+     "281",
+     "primary"
+    ]
+   ]
+  },
+  {
+   "code": "LIGHT_NO_HEADLIGHTS_NIGHT",
+   "name": "Driving at night without headlights",
+   "grp": "modifications_and_compliance",
+   "mv_section": "177 r/w CMVR 105",
+   "description": "Driving after dark without headlamps or tail lamps switched on or working.",
+   "compoundable": true,
+   "what_to_do_next": "Pay the challan and fix or switch on the lamps before driving again.",
+   "tips_to_avoid": "Check headlamps and tail lamps before night trips; two-wheelers from 2017 keep headlights always on.",
+   "officer_action": "Challan under s.177.",
+   "evidence_req": "Officer observation or camera image.",
+   "severity": "minor",
+   "road_buckets": [
+    "highway",
+    "main_road",
+    "street"
+   ],
+   "keywords": [
+    "without headlights",
+    "no headlights",
+    "headlights off",
+    "lights off at night",
+    "without lights at night",
+    "no lights at night",
+    "headlight not working"
+   ],
+   "penalty": {
+    "first_offence": 500,
+    "repeat_offence": 1500,
+    "note": "General penalty, MV Act s.177"
+   },
+   "provisions": [
+    [
+     "MV Act 1988",
+     "177",
+     "primary"
+    ]
+   ]
+  },
+  {
+   "code": "SAFETY_FOOTBOARD_TRAVEL",
+   "name": "Passengers travelling on the footboard",
+   "grp": "overloading_and_capacity",
+   "mv_section": "177 r/w state rules",
+   "description": "Allowing passengers to stand or hang on the footboard or steps of a bus.",
+   "compoundable": true,
+   "what_to_do_next": "Pay the challan; passengers must be moved inside before the bus continues.",
+   "tips_to_avoid": "Close doors before moving; do not start while anyone is on the steps.",
+   "officer_action": "Challan to the conductor and driver.",
+   "evidence_req": "Photo or officer observation.",
+   "severity": "minor",
+   "road_buckets": [
+    "highway",
+    "main_road",
+    "street"
+   ],
+   "keywords": [
+    "footboard",
+    "foot board",
+    "hanging on the door",
+    "standing on the steps",
+    "footboard travel"
+   ],
+   "penalty": {
+    "first_offence": 500,
+    "repeat_offence": 1500,
+    "note": "General penalty, MV Act s.177"
+   },
+   "provisions": [
+    [
+     "MV Act 1988",
+     "177",
+     "primary"
+    ]
+   ]
+  }
+ ],
+ "penalty_corrections": [
+  {
+   "violation_code": "ACC_CAUSING_DEATH",
+   "scope": "central",
+   "imprisonment": "up to 5 years and fine (BNS 106(1)); up to 10 years if the driver escapes without reporting (BNS 106(2), not yet in force)",
+   "why": "Graph v3 carried the old IPC 304A wording '2–7 years'. BNS 106(1) replaced it from 1 July 2024."
+  }
+ ],
+ "violation_provisions": [
+  [
+   "DOC_UNDERAGE",
+   "MV Act 1988",
+   "199A",
+   "primary"
+  ],
+  [
+   "JUV_MINOR_DRIVING",
+   "MV Act 1988",
+   "199A",
+   "primary"
+  ],
+  [
+   "DOC_NO_DL",
+   "MV Act 1988",
+   "181",
+   "primary"
+  ],
+  [
+   "DOC_UNAUTHORIZED_USE_VEHICLE",
+   "MV Act 1988",
+   "180",
+   "primary"
+  ],
+  [
+   "DANGER_RASH_DRIVING",
+   "MV Act 1988",
+   "184",
+   "primary"
+  ],
+  [
+   "SIGNAL_RED_LIGHT_JUMPING",
+   "MV Act 1988",
+   "184",
+   "primary"
+  ],
+  [
+   "DIR_WRONG_WAY",
+   "MV Act 1988",
+   "184",
+   "primary"
+  ],
+  [
+   "IMPAIRED_DRUNK",
+   "MV Act 1988",
+   "185",
+   "primary"
+  ],
+  [
+   "IMPAIRED_DRUGS",
+   "MV Act 1988",
+   "185",
+   "primary"
+  ],
+  [
+   "ACC_NOT_REPORT",
+   "MV Act 1988",
+   "134",
+   "primary"
+  ],
+  [
+   "ACC_HIT_AND_RUN",
+   "MV Act 1988",
+   "187",
+   "primary"
+  ],
+  [
+   "ACC_HIT_AND_RUN",
+   "MV Act 1988",
+   "134",
+   "related"
+  ],
+  [
+   "ACC_HIT_AND_RUN",
+   "BNS 2023",
+   "106(2)",
+   "aggravated"
+  ],
+  [
+   "ACC_HIT_AND_RUN_RELATED",
+   "MV Act 1988",
+   "187",
+   "primary"
+  ],
+  [
+   "ACC_CAUSING_DEATH",
+   "BNS 2023",
+   "106(1)",
+   "primary"
+  ],
+  [
+   "OVERLOAD_GOODS_WEIGHT",
+   "MV Act 1988",
+   "194",
+   "primary"
+  ],
+  [
+   "OVERLOAD_PASSENGER",
+   "MV Act 1988",
+   "194A",
+   "primary"
+  ],
+  [
+   "SAFETY_NO_SEATBELT_DRIVER",
+   "MV Act 1988",
+   "194B",
+   "primary"
+  ],
+  [
+   "SAFETY_NO_SEATBELT_PASSENGER",
+   "MV Act 1988",
+   "194B",
+   "primary"
+  ],
+  [
+   "SAFETY_NO_CHILD_RESTRAINT",
+   "MV Act 1988",
+   "194B",
+   "primary"
+  ],
+  [
+   "SAFETY_MORE_THAN_2_ON_2W",
+   "MV Act 1988",
+   "194C",
+   "primary"
+  ],
+  [
+   "SAFETY_NO_HELMET_RIDER",
+   "MV Act 1988",
+   "194D",
+   "primary"
+  ],
+  [
+   "SAFETY_NO_HELMET_PILLION",
+   "MV Act 1988",
+   "194D",
+   "primary"
+  ],
+  [
+   "DOC_NO_INSURANCE",
+   "MV Act 1988",
+   "196",
+   "primary"
+  ],
+  [
+   "MISC_GENERAL",
+   "MV Act 1988",
+   "177",
+   "primary"
+  ]
+ ],
+ "liability": {
+  "group_defaults": {
+   "speeding": [
+    "driver"
+   ],
+   "signal_and_signage": [
+    "driver"
+   ],
+   "lane_and_direction": [
+    "driver"
+   ],
+   "dangerous_driving": [
+    "driver"
+   ],
+   "distracted_driving": [
+    "driver"
+   ],
+   "impaired_driving": [
+    "driver"
+   ],
+   "highway_specific": [
+    "driver"
+   ],
+   "pedestrian_and_vulnerable": [
+    "driver"
+   ],
+   "parking_and_stopping": [
+    "driver"
+   ],
+   "accident_and_emergency": [
+    "driver"
+   ],
+   "safety_gear": [
+    "driver"
+   ],
+   "documents": [
+    "driver"
+   ],
+   "modifications_and_compliance": [
+    "owner",
+    "driver?"
+   ],
+   "emission_and_noise": [
+    "owner",
+    "driver?"
+   ],
+   "ev_specific": [
+    "owner"
+   ],
+   "commercial_and_permits": [
+    "driver"
+   ],
+   "overloading_and_capacity": [
+    "driver",
+    "owner?"
+   ],
+   "juvenile_and_guardian": [
+    "guardian",
+    "owner"
+   ]
+  },
+  "overrides": {
+   "SAFETY_NO_HELMET_RIDER": [
+    [
+     "rider",
+     "194D",
+     "liable"
+    ]
+   ],
+   "SAFETY_NO_HELMET_PILLION": [
+    [
+     "pillion",
+     "194D",
+     "liable"
+    ],
+    [
+     "rider",
+     "194D",
+     "may_be_liable",
+     "Several states fine the rider for an unhelmeted pillion."
+    ]
+   ],
+   "SAFETY_NO_CHILD_2W": [
+    [
+     "rider",
+     "129",
+     "liable"
+    ]
+   ],
+   "SAFETY_MORE_THAN_2_ON_2W": [
+    [
+     "rider",
+     "194C",
+     "liable"
+    ]
+   ],
+   "SAFETY_NO_SEATBELT_DRIVER": [
+    [
+     "driver",
+     "194B",
+     "liable"
+    ]
+   ],
+   "SAFETY_NO_SEATBELT_PASSENGER": [
+    [
+     "driver",
+     "194B",
+     "liable",
+     "s.194B punishes whoever carries passengers not wearing seat belts."
+    ],
+    [
+     "passenger",
+     "194B",
+     "may_be_liable",
+     "Some states challan the passenger directly."
+    ]
+   ],
+   "SAFETY_NO_CHILD_RESTRAINT": [
+    [
+     "driver",
+     "194B",
+     "liable"
+    ]
+   ],
+   "SAFETY_NO_AIRBAG": [
+    [
+     "owner",
+     "110",
+     "liable"
+    ]
+   ],
+   "SAFETY_NO_ADAS": [
+    [
+     "owner",
+     "110",
+     "liable"
+    ]
+   ],
+   "DOC_UNDERAGE": [
+    [
+     "guardian",
+     "199A",
+     "liable"
+    ],
+    [
+     "owner",
+     "199A",
+     "liable"
+    ]
+   ],
+   "JUV_MINOR_DRIVING": [
+    [
+     "guardian",
+     "199A",
+     "liable"
+    ],
+    [
+     "owner",
+     "199A",
+     "liable"
+    ]
+   ],
+   "DOC_UNAUTHORIZED_USE_VEHICLE": [
+    [
+     "owner",
+     "180",
+     "liable"
+    ]
+   ],
+   "DOC_TAKING_VEHICLE_WITHOUT_AUTH": [
+    [
+     "driver",
+     "197",
+     "liable"
+    ]
+   ],
+   "DOC_NO_INSURANCE": [
+    [
+     "driver",
+     "196",
+     "liable"
+    ],
+    [
+     "owner",
+     "196",
+     "liable",
+     "Whoever drives or causes or allows an uninsured vehicle."
+    ]
+   ],
+   "DOC_NO_PUC": [
+    [
+     "driver",
+     "190(2)",
+     "liable"
+    ],
+    [
+     "owner",
+     "190(2)",
+     "may_be_liable"
+    ]
+   ],
+   "DOC_NO_RC": [
+    [
+     "driver",
+     "192",
+     "liable"
+    ]
+   ],
+   "DOC_EXPIRED_RC": [
+    [
+     "owner",
+     "192",
+     "liable"
+    ],
+    [
+     "driver",
+     "192",
+     "may_be_liable"
+    ]
+   ],
+   "DOC_NO_FITNESS": [
+    [
+     "owner",
+     "192",
+     "liable"
+    ],
+    [
+     "driver",
+     "192",
+     "may_be_liable"
+    ]
+   ],
+   "DOC_DISOBEY_AUTHORITY": [
+    [
+     "any",
+     "179",
+     "liable"
+    ]
+   ],
+   "DOC_UNAUTHORIZED_INTERFERENCE": [
+    [
+     "any",
+     "198",
+     "liable"
+    ]
+   ],
+   "OVERLOAD_GOODS_WEIGHT": [
+    [
+     "driver",
+     "194",
+     "liable"
+    ],
+    [
+     "owner",
+     "194",
+     "liable",
+     "Whoever drives or causes or allows an overloaded vehicle."
+    ]
+   ],
+   "OVERLOAD_AXLE": [
+    [
+     "driver",
+     "194",
+     "liable"
+    ],
+    [
+     "owner",
+     "194",
+     "liable"
+    ]
+   ],
+   "OVERLOAD_PROJECTING_LOAD": [
+    [
+     "driver",
+     "194",
+     "liable"
+    ],
+    [
+     "owner",
+     "194",
+     "may_be_liable"
+    ]
+   ],
+   "OVERLOAD_PASSENGER": [
+    [
+     "driver",
+     "194A",
+     "liable"
+    ],
+    [
+     "conductor",
+     "194A",
+     "liable"
+    ],
+    [
+     "owner",
+     "194A",
+     "may_be_liable"
+    ]
+   ],
+   "OVERLOAD_GOODS_CARRYING_PASSENGERS": [
+    [
+     "driver",
+     "192A",
+     "liable"
+    ],
+    [
+     "owner",
+     "192A",
+     "liable"
+    ]
+   ],
+   "SAFETY_FOOTBOARD_TRAVEL": [
+    [
+     "conductor",
+     "177",
+     "liable"
+    ],
+    [
+     "driver",
+     "177",
+     "liable"
+    ]
+   ],
+   "COMM_NO_PERMIT": [
+    [
+     "driver",
+     "192A",
+     "liable"
+    ],
+    [
+     "owner",
+     "192A",
+     "liable"
+    ]
+   ],
+   "COMM_PERMIT_ROUTE_VIOLATION": [
+    [
+     "driver",
+     "192A",
+     "liable"
+    ],
+    [
+     "owner",
+     "192A",
+     "liable"
+    ]
+   ],
+   "COMM_SCHOOL_BUS_VIOLATION": [
+    [
+     "operator",
+     "190",
+     "liable"
+    ],
+    [
+     "driver",
+     "190",
+     "may_be_liable"
+    ]
+   ],
+   "SCHOOL_BUS_GPS_CAMERA": [
+    [
+     "operator",
+     "190",
+     "liable"
+    ]
+   ],
+   "COMM_AGGREGATOR_NO_LICENCE": [
+    [
+     "operator",
+     "93",
+     "liable"
+    ]
+   ],
+   "COMM_NO_GPS_VLTS": [
+    [
+     "owner",
+     "190",
+     "liable"
+    ]
+   ],
+   "COMM_NO_PANIC_BUTTON": [
+    [
+     "owner",
+     "190",
+     "liable"
+    ]
+   ],
+   "COMM_OVERSIZE_VEHICLE": [
+    [
+     "owner",
+     "182B",
+     "liable"
+    ],
+    [
+     "driver",
+     "182B",
+     "may_be_liable"
+    ]
+   ],
+   "ACC_DRIVER_FATIGUE": [
+    [
+     "employer",
+     "91",
+     "liable"
+    ],
+    [
+     "driver",
+     "91",
+     "may_be_liable"
+    ]
+   ],
+   "SPEED_GOVERNOR_TAMPER": [
+    [
+     "owner",
+     "190",
+     "liable"
+    ],
+    [
+     "driver",
+     "190",
+     "may_be_liable"
+    ]
+   ],
+   "DANGER_CARRYING_HAZARDOUS": [
+    [
+     "driver",
+     "190(3)",
+     "liable"
+    ],
+    [
+     "owner",
+     "190(3)",
+     "liable"
+    ]
+   ],
+   "DANGER_UNSAFE_VEHICLE": [
+    [
+     "driver",
+     "190(1)",
+     "liable"
+    ],
+    [
+     "owner",
+     "190(1)",
+     "may_be_liable"
+    ]
+   ],
+   "NOISE_CONTINUOUS_HORN": [
+    [
+     "driver",
+     "194F",
+     "liable"
+    ]
+   ],
+   "NOISE_HORN_SILENT_ZONE": [
+    [
+     "driver",
+     "194F",
+     "liable"
+    ]
+   ],
+   "MOD_FAKE_NUMBER_PLATE": [
+    [
+     "owner",
+     "177",
+     "liable"
+    ],
+    [
+     "driver",
+     "177",
+     "may_be_liable"
+    ]
+   ],
+   "CYCLIST_DOORING": [
+    [
+     "any",
+     "177",
+     "liable"
+    ]
+   ],
+   "PARK_ABANDONED": [
+    [
+     "owner",
+     "201",
+     "liable"
+    ]
+   ],
+   "MISC_GENERAL": [
+    [
+     "any",
+     "177",
+     "liable"
+    ]
+   ],
+   "CRIM_HURT_RASH_NEGLIGENT": [
+    [
+     "driver",
+     "BNS 125",
+     "liable"
+    ]
+   ],
+   "CRIM_RASH_DRIVING_PUBLIC_WAY": [
+    [
+     "driver",
+     "BNS 281",
+     "liable"
+    ]
+   ],
+   "LIGHT_NO_HEADLIGHTS_NIGHT": [
+    [
+     "driver",
+     "177",
+     "liable"
+    ]
+   ],
+   "ACC_CAUSING_DEATH": [
+    [
+     "driver",
+     "BNS 106(1)",
+     "liable"
+    ]
+   ]
+  }
+ },
+ "facts": [
+  {
+   "name": "actor.age",
+   "type": "int",
+   "question": "How old was the person driving?",
+   "chips": [
+    {
+     "label": "Under 18",
+     "value": 17
+    },
+    {
+     "label": "18 or older",
+     "value": 18
+    }
+   ]
+  },
+  {
+   "name": "actor.licence",
+   "type": "enum",
+   "values": [
+    "valid",
+    "none",
+    "learner",
+    "expired",
+    "suspended"
+   ],
+   "question": "Did the person driving have a valid driving licence?",
+   "chips": [
+    {
+     "label": "Yes, valid licence",
+     "value": "valid"
+    },
+    {
+     "label": "No licence",
+     "value": "none"
+    },
+    {
+     "label": "Learner's licence only",
+     "value": "learner"
+    }
+   ]
+  },
+  {
+   "name": "actor.is_victim",
+   "type": "bool",
+   "question": null
+  },
+  {
+   "name": "vehicle.segment",
+   "type": "enum",
+   "values": [
+    "two_wheeler",
+    "three_wheeler",
+    "four_wheeler",
+    "four_wheeler_plus",
+    "heavy_vehicle",
+    "special",
+    "emergency"
+   ],
+   "question": "Which vehicle was it?",
+   "chips": [
+    {
+     "label": "Two-wheeler",
+     "value": "two_wheeler"
+    },
+    {
+     "label": "Car",
+     "value": "four_wheeler"
+    },
+    {
+     "label": "Auto",
+     "value": "three_wheeler"
+    },
+    {
+     "label": "Bus",
+     "value": "four_wheeler_plus"
+    },
+    {
+     "label": "Truck",
+     "value": "heavy_vehicle"
+    }
+   ]
+  },
+  {
+   "name": "vehicle.use",
+   "type": "enum",
+   "values": [
+    "private",
+    "commercial_passenger",
+    "commercial_goods"
+   ],
+   "question": "Is it a private vehicle or a commercial (taxi, bus, goods) vehicle?",
+   "chips": [
+    {
+     "label": "Private",
+     "value": "private"
+    },
+    {
+     "label": "Commercial passenger",
+     "value": "commercial_passenger"
+    },
+    {
+     "label": "Commercial goods",
+     "value": "commercial_goods"
+    }
+   ]
+  },
+  {
+   "name": "vehicle.occupants",
+   "type": "int",
+   "question": "How many people were on the vehicle?"
+  },
+  {
+   "name": "event.outcome",
+   "type": "enum",
+   "values": [
+    "none",
+    "damage",
+    "injury",
+    "grievous_injury",
+    "death"
+   ],
+   "question": "Was anyone hurt?",
+   "chips": [
+    {
+     "label": "No one was hurt",
+     "value": "none"
+    },
+    {
+     "label": "Minor injuries",
+     "value": "injury"
+    },
+    {
+     "label": "Serious injuries",
+     "value": "grievous_injury"
+    },
+    {
+     "label": "Someone died",
+     "value": "death"
+    }
+   ]
+  },
+  {
+   "name": "event.fled",
+   "type": "bool",
+   "question": "Did the driver leave the scene without helping or reporting?",
+   "chips": [
+    {
+     "label": "Yes, they left",
+     "value": true
+    },
+    {
+     "label": "No, they stayed",
+     "value": false
+    }
+   ]
+  },
+  {
+   "name": "event.speed_over_pct",
+   "type": "int",
+   "question": "Roughly how far over the limit were they?"
+  },
+  {
+   "name": "event.zone",
+   "type": "enum",
+   "values": [
+    "school",
+    "hospital",
+    "residential",
+    "highway",
+    "city",
+    "rural"
+   ]
+  },
+  {
+   "name": "event.time",
+   "type": "enum",
+   "values": [
+    "day",
+    "night"
+   ]
+  },
+  {
+   "name": "owner.permitted",
+   "type": "bool",
+   "question": "Did the owner let them use the vehicle?",
+   "chips": [
+    {
+     "label": "Yes, with permission",
+     "value": true
+    },
+    {
+     "label": "No, taken without asking",
+     "value": false
+    }
+   ]
+  }
+ ],
+ "conditions": [
+  [
+   "DOC_UNDERAGE",
+   "actor.age",
+   "<",
+   18,
+   "required",
+   "Only a driver under 18 is underage for most vehicles."
+  ],
+  [
+   "JUV_MINOR_DRIVING",
+   "actor.age",
+   "<",
+   18,
+   "required",
+   null
+  ],
+  [
+   "DOC_NO_DL",
+   "actor.licence",
+   "in",
+   [
+    "none",
+    "expired",
+    "learner"
+   ],
+   "required",
+   null
+  ],
+  [
+   "DOC_NO_DL",
+   "actor.age",
+   ">=",
+   18,
+   "required",
+   "Under 18 is charged as underage driving (s.199A) instead."
+  ],
+  [
+   "SPEED_OVER_LMV",
+   "vehicle.segment",
+   "in",
+   [
+    "two_wheeler",
+    "three_wheeler",
+    "four_wheeler"
+   ],
+   "required",
+   null
+  ],
+  [
+   "SPEED_OVER_MMV_HMV",
+   "vehicle.segment",
+   "in",
+   [
+    "four_wheeler_plus",
+    "heavy_vehicle",
+    "special"
+   ],
+   "required",
+   null
+  ],
+  [
+   "SPEED_EXCESSIVE_50PLUS",
+   "event.speed_over_pct",
+   ">=",
+   50,
+   "required",
+   null
+  ],
+  [
+   "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE",
+   "event.zone",
+   "in",
+   [
+    "school",
+    "hospital",
+    "residential"
+   ],
+   "required",
+   null
+  ],
+  [
+   "SAFETY_NO_HELMET_RIDER",
+   "vehicle.segment",
+   "=",
+   "two_wheeler",
+   "required",
+   null
+  ],
+  [
+   "SAFETY_NO_HELMET_PILLION",
+   "vehicle.segment",
+   "=",
+   "two_wheeler",
+   "required",
+   null
+  ],
+  [
+   "SAFETY_MORE_THAN_2_ON_2W",
+   "vehicle.segment",
+   "=",
+   "two_wheeler",
+   "required",
+   null
+  ],
+  [
+   "SAFETY_MORE_THAN_2_ON_2W",
+   "vehicle.occupants",
+   ">=",
+   3,
+   "required",
+   null
+  ],
+  [
+   "SAFETY_NO_CHILD_2W",
+   "vehicle.segment",
+   "=",
+   "two_wheeler",
+   "required",
+   null
+  ],
+  [
+   "SAFETY_NO_SEATBELT_DRIVER",
+   "vehicle.segment",
+   "not_in",
+   [
+    "two_wheeler",
+    "three_wheeler"
+   ],
+   "required",
+   null
+  ],
+  [
+   "SAFETY_NO_SEATBELT_PASSENGER",
+   "vehicle.segment",
+   "not_in",
+   [
+    "two_wheeler",
+    "three_wheeler"
+   ],
+   "required",
+   null
+  ],
+  [
+   "SAFETY_NO_CHILD_RESTRAINT",
+   "vehicle.segment",
+   "not_in",
+   [
+    "two_wheeler"
+   ],
+   "required",
+   null
+  ],
+  [
+   "OVERLOAD_GOODS_WEIGHT",
+   "vehicle.segment",
+   "in",
+   [
+    "heavy_vehicle",
+    "four_wheeler",
+    "three_wheeler"
+   ],
+   "required",
+   null
+  ],
+  [
+   "OVERLOAD_GOODS_WEIGHT",
+   "vehicle.use",
+   "=",
+   "commercial_goods",
+   "required",
+   null
+  ],
+  [
+   "OVERLOAD_PASSENGER",
+   "vehicle.segment",
+   "!=",
+   "two_wheeler",
+   "required",
+   "Two-wheelers are covered by s.194C (triple riding)."
+  ],
+  [
+   "SAFETY_FOOTBOARD_TRAVEL",
+   "vehicle.segment",
+   "=",
+   "four_wheeler_plus",
+   "required",
+   null
+  ],
+  [
+   "COMM_REFUSAL",
+   "vehicle.use",
+   "=",
+   "commercial_passenger",
+   "required",
+   null
+  ],
+  [
+   "COMM_OVERCHARGE",
+   "vehicle.use",
+   "=",
+   "commercial_passenger",
+   "required",
+   null
+  ],
+  [
+   "COMM_NO_FARE_METER",
+   "vehicle.use",
+   "=",
+   "commercial_passenger",
+   "required",
+   null
+  ],
+  [
+   "COMM_NO_PERMIT",
+   "vehicle.use",
+   "in",
+   [
+    "commercial_passenger",
+    "commercial_goods"
+   ],
+   "required",
+   null
+  ],
+  [
+   "ACC_CAUSING_DEATH",
+   "event.outcome",
+   "=",
+   "death",
+   "required",
+   null
+  ],
+  [
+   "CRIM_HURT_RASH_NEGLIGENT",
+   "event.outcome",
+   "in",
+   [
+    "injury",
+    "grievous_injury"
+   ],
+   "required",
+   null
+  ],
+  [
+   "ACC_HIT_AND_RUN",
+   "event.fled",
+   "=",
+   true,
+   "required",
+   null
+  ],
+  [
+   "ACC_HIT_AND_RUN_RELATED",
+   "event.fled",
+   "=",
+   true,
+   "required",
+   null
+  ],
+  [
+   "LIGHT_NO_HEADLIGHTS_NIGHT",
+   "event.time",
+   "=",
+   "night",
+   "required",
+   null
+  ],
+  [
+   "DOC_UNAUTHORIZED_USE_VEHICLE",
+   "owner.permitted",
+   "=",
+   true,
+   "required",
+   "Without permission it is the driver's offence under s.197 instead."
+  ],
+  [
+   "DOC_TAKING_VEHICLE_WITHOUT_AUTH",
+   "owner.permitted",
+   "=",
+   false,
+   "required",
+   null
+  ]
+ ],
+ "relations": [
+  [
+   "DOC_UNDERAGE",
+   "JUV_MINOR_DRIVING",
+   "subsumes",
+   null,
+   null,
+   "Same s.199A liability; report it once."
+  ],
+  [
+   "DOC_UNDERAGE",
+   "DOC_NO_DL",
+   "subsumes",
+   null,
+   null,
+   "A minor cannot hold a licence; s.199A covers it."
+  ],
+  [
+   "DOC_UNDERAGE",
+   "DOC_UNAUTHORIZED_USE_VEHICLE",
+   "subsumes",
+   null,
+   null,
+   "For a juvenile driver s.199A replaces s.180."
+  ],
+  [
+   "DOC_NO_DL",
+   "DOC_UNAUTHORIZED_USE_VEHICLE",
+   "implies",
+   "owner",
+   {
+    "fact": "owner.permitted",
+    "op": "=",
+    "value": true
+   },
+   "Owner who let an unlicensed person drive (s.180)."
+  ],
+  [
+   "DOC_DISQUALIFIED_DRIVING",
+   "DOC_UNAUTHORIZED_USE_VEHICLE",
+   "implies",
+   "owner",
+   {
+    "fact": "owner.permitted",
+    "op": "=",
+    "value": true
+   },
+   "Owner who let a disqualified person drive (s.180)."
+  ],
+  [
+   "SPEED_EXCESSIVE_50PLUS",
+   "SPEED_OVER_LMV",
+   "subsumes",
+   null,
+   null,
+   null
+  ],
+  [
+   "SPEED_EXCESSIVE_50PLUS",
+   "SPEED_OVER_MMV_HMV",
+   "subsumes",
+   null,
+   null,
+   null
+  ],
+  [
+   "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE",
+   "SPEED_OVER_LMV",
+   "subsumes",
+   null,
+   null,
+   null
+  ],
+  [
+   "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE",
+   "SPEED_OVER_MMV_HMV",
+   "subsumes",
+   null,
+   null,
+   null
+  ],
+  [
+   "SPEED_OVER_MMV_HMV",
+   "SPEED_OVER_LMV",
+   "alternative",
+   null,
+   null,
+   "Vehicle class decides which speeding section applies."
+  ],
+  [
+   "ACC_HIT_AND_RUN",
+   "ACC_HIT_AND_RUN_RELATED",
+   "subsumes",
+   null,
+   null,
+   null
+  ],
+  [
+   "ACC_HIT_AND_RUN",
+   "ACC_NOT_REPORT",
+   "subsumes",
+   null,
+   null,
+   null
+  ],
+  [
+   "ACC_CAUSING_DEATH",
+   "CRIM_HURT_RASH_NEGLIGENT",
+   "subsumes",
+   null,
+   null,
+   null
+  ],
+  [
+   "SAFETY_NO_HELMET_RIDER",
+   "SAFETY_NO_HELMET_PILLION",
+   "co_charged",
+   null,
+   null,
+   null
+  ],
+  [
+   "DANGER_RASH_DRIVING",
+   "CRIM_RASH_DRIVING_PUBLIC_WAY",
+   "aggravates",
+   "driver",
+   {
+    "fact": "event.outcome",
+    "op": "in",
+    "value": [
+     "damage",
+     "injury",
+     "grievous_injury"
+    ]
+   },
+   "Endangering people adds the criminal charge."
+  ],
+  [
+   "DANGER_RACING",
+   "CRIM_RASH_DRIVING_PUBLIC_WAY",
+   "aggravates",
+   "driver",
+   {
+    "fact": "event.outcome",
+    "op": "in",
+    "value": [
+     "damage",
+     "injury",
+     "grievous_injury"
+    ]
+   },
+   null
+  ],
+  [
+   "DANGER_STUNT_WHEELIE",
+   "CRIM_RASH_DRIVING_PUBLIC_WAY",
+   "aggravates",
+   "driver",
+   {
+    "fact": "event.outcome",
+    "op": "in",
+    "value": [
+     "damage",
+     "injury",
+     "grievous_injury"
+    ]
+   },
+   null
+  ],
+  [
+   "SPEED_EXCESSIVE_50PLUS",
+   "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE",
+   "subsumes",
+   null,
+   null,
+   "One speeding act: the 50%+ charge replaces the zone charge."
+  ]
+ ],
+ "fault_offences_for_injury": [
+  "DANGER_RASH_DRIVING",
+  "DANGER_RACING",
+  "DANGER_STUNT_WHEELIE",
+  "SIGNAL_RED_LIGHT_JUMPING",
+  "DIR_WRONG_WAY",
+  "IMPAIRED_DRUNK",
+  "IMPAIRED_DRUGS",
+  "SPEED_OVER_LMV",
+  "SPEED_OVER_MMV_HMV",
+  "SPEED_EXCESSIVE_50PLUS",
+  "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE",
+  "DIST_MOBILE_USE",
+  "DIR_ILLEGAL_OVERTAKING",
+  "DIR_CUTTING_LANE",
+  "DANGER_ROAD_RAGE",
+  "ACC_HIT_AND_RUN",
+  "PED_ZEBRA_VIOLATION",
+  "DOC_UNDERAGE",
+  "DOC_NO_DL",
+  "PED_FOOTPATH_DRIVING",
+  "DIR_ONE_WAY_VIOLATION",
+  "DIR_NO_ENTRY",
+  "CYCLIST_DOORING",
+  "DIST_HEADPHONES",
+  "DIST_EATING_GROOMING",
+  "LIGHT_NO_HEADLIGHTS_NIGHT",
+  "PARK_NIGHT_NO_LIGHTS",
+  "DIR_LANE_DISCIPLINE",
+  "DIR_FAIL_TO_YIELD",
+  "SAFETY_MORE_THAN_2_ON_2W",
+  "DOC_TAKING_VEHICLE_WITHOUT_AUTH",
+  "ACC_DRIVER_FATIGUE",
+  "DANGER_UNSAFE_VEHICLE",
+  "OVERLOAD_GOODS_WEIGHT",
+  "OVERLOAD_PASSENGER"
+ ],
+ "licence_actions": {
+  "SAFETY_NO_HELMET_RIDER": "Licence disqualified for 3 months (s.194D)",
+  "SAFETY_NO_HELMET_PILLION": "Rider's licence may be disqualified for 3 months (s.194D)",
+  "SAFETY_MORE_THAN_2_ON_2W": "Licence disqualified for 3 months (s.194C)",
+  "IMPAIRED_DRUNK": "Licence impounded and suspended (s.206(4) r/w s.19)",
+  "IMPAIRED_DRUGS": "Licence impounded and suspended (s.206(4) r/w s.19)",
+  "DIST_MOBILE_USE": "Licence may be impounded (s.206(4))",
+  "SIGNAL_RED_LIGHT_JUMPING": "Licence may be suspended on repeat (s.19)",
+  "DANGER_RASH_DRIVING": "Licence may be impounded and suspended (s.206(4))",
+  "DANGER_RACING": "Licence may be impounded and suspended (s.206(4))",
+  "SPEED_OVER_LMV": "Licence may be impounded on repeat (s.206(4))",
+  "SPEED_OVER_MMV_HMV": "Licence may be impounded on repeat (s.206(4))",
+  "DOC_UNDERAGE": "Vehicle registration cancelled for 12 months; the juvenile cannot get a licence until 25 (s.199A)",
+  "JUV_MINOR_DRIVING": "Vehicle registration cancelled for 12 months; the juvenile cannot get a licence until 25 (s.199A)",
+  "ACC_HIT_AND_RUN": "Licence likely suspended or revoked",
+  "ACC_CAUSING_DEATH": "Licence likely suspended or revoked"
+ },
+ "examples": {
+  "SAFETY_MORE_THAN_2_ON_2W": [
+   "me and two friends on one bike",
+   "three of us were on the scooty",
+   "teen log ek bike pe"
+  ],
+  "SAFETY_NO_HELMET_PILLION": [
+   "my friend on the back had no helmet",
+   "pillion without helmet",
+   "the person behind me wasn't wearing a helmet",
+   "friend on the back without helmet",
+   "pillion had no helmet",
+   "on the back also without a helmet"
+  ],
+  "IMPAIRED_DRUNK": [
+   "I was driving drunk",
+   "had a few beers and drove",
+   "daaru pi ke gaadi chala raha tha",
+   "driving drunk",
+   "drunk driving",
+   "riding drunk"
+  ],
+  "SAFETY_NO_SEATBELT_DRIVER": [
+   "my seatbelt was off",
+   "I wasn't wearing my seat belt while driving",
+   "seatbelt off",
+   "seat belt off",
+   "my seatbelt was off",
+   "without my seatbelt"
+  ],
+  "OVERLOAD_PASSENGER": [
+   "carrying 6 passengers in the auto",
+   "20 extra people in the bus",
+   "too many people in the van",
+   "extra passengers",
+   "6 passengers",
+   "extra people standing",
+   "carrying too many people"
+  ],
+  "DOC_NO_INSURANCE": [
+   "the insurance had expired",
+   "bike insurance expired",
+   "no insurance on the car",
+   "insurance also expired",
+   "insurance has expired",
+   "insurance had expired"
+  ],
+  "ACC_HIT_AND_RUN": [
+   "he drove off after hitting me",
+   "ran away after the accident",
+   "the driver fled",
+   "drove off",
+   "ran away after the accident",
+   "fled after hitting",
+   "drove away after hitting"
+  ],
+  "DOC_UNDERAGE": [
+   "my 16 year old son was driving",
+   "a minor was driving the car",
+   "my 15 year old took the scooty"
+  ],
+  "COMM_NO_PERMIT": [
+   "the truck had no permit",
+   "running the taxi without a permit",
+   "no permit",
+   "without permit",
+   "without a permit"
+  ],
+  "MOD_FANCY_NUMBERPLATE": [
+   "fancy number plate",
+   "the number plate had a stylish font",
+   "fancy plate",
+   "number plate was fancy",
+   "fancy number plate"
+  ],
+  "LIGHT_NO_HEADLIGHTS_NIGHT": [
+   "riding at night without headlights",
+   "headlights were off at night"
+  ],
+  "CRIM_HURT_RASH_NEGLIGENT": [
+   "injured someone",
+   "hit a pedestrian",
+   "knocked down",
+   "he got hurt",
+   "caused injury",
+   "rammed into"
+  ],
+  "CRIM_RASH_DRIVING_PUBLIC_WAY": [
+   "endangered lives",
+   "nearly hit people",
+   "could have killed someone"
+  ],
+  "DANGER_RACING": [
+   "were racing",
+   "racing two bikes",
+   "racing on the road"
+  ],
+  "SPEED_IN_RESIDENTIAL_SCHOOL_ZONE": [
+   "near a school",
+   "school zone"
+  ],
+  "OVERLOAD_PROJECTING_LOAD": [
+   "sticking out",
+   "rods sticking out",
+   "load sticking out",
+   "projecting load"
+  ],
+  "DIR_CUTTING_LANE": [
+   "cut across lanes",
+   "cutting across lanes",
+   "zig zag",
+   "zig-zag",
+   "weaving through traffic"
+  ],
+  "PARK_DISABLED_SPOT": [
+   "disabled spot",
+   "disabled parking",
+   "handicapped parking"
+  ],
+  "DANGER_STUNT_WHEELIE": [
+   "doing wheelies",
+   "wheelies",
+   "doing stunts"
+  ],
+  "DOC_FAKE_DL": [
+   "fake licence",
+   "fake license",
+   "forged licence",
+   "duplicate licence"
+  ],
+  "CYCLIST_DOORING": [
+   "opened his door",
+   "opened the door",
+   "opened her door",
+   "opened the car door"
+  ],
+  "DIR_WRONG_WAY": [
+   "going the wrong way",
+   "wrong way down",
+   "drove the wrong way"
+  ],
+  "COMM_RIDE_HAILING_REFUSAL": [
+   "ola driver refused",
+   "uber driver refused",
+   "cab driver cancelled",
+   "refused my ride"
+  ],
+  "OVERLOAD_GOODS_CARRYING_PASSENGERS": [
+   "goods vehicle carrying passengers",
+   "passengers in the back of the tempo",
+   "carrying passengers in the back",
+   "people on its trolley",
+   "people on the trolley",
+   "carrying people on",
+   "passengers on a goods vehicle"
+  ],
+  "EMERG_NO_WAY_TO_AMBULANCE": [
+   "didn't give way",
+   "did not give way",
+   "ambulance was behind me"
+  ],
+  "FASTAG_NONE": [
+   "not having fastag",
+   "no fastag",
+   "without fastag",
+   "fastag not working"
+  ],
+  "DANGER_RASH_DRIVING": [
+   "driving rashly",
+   "drove rashly",
+   "rash driving",
+   "riding rashly"
+  ],
+  "DOC_NO_RC": [
+   "didn't have my rc",
+   "didn't have the rc",
+   "rc not with me",
+   "no rc"
+  ],
+  "EMERG_OBSTRUCT_AMBULANCE": [
+   "refused to move",
+   "stuck behind",
+   "blocked the ambulance",
+   "didn't move for the ambulance"
+  ],
+  "MOD_NO_REAR_REFLECTOR": [
+   "no reflectors",
+   "without reflectors",
+   "reflectors missing",
+   "no tail lamp"
+  ],
+  "DOC_DISOBEY_AUTHORITY": [
+   "refused to show my documents",
+   "refused to show documents",
+   "argued with the police",
+   "refused to give my licence"
+  ],
+  "PED_ZEBRA_VIOLATION": [
+   "crossing at the zebra crossing",
+   "at the zebra crossing",
+   "on the zebra crossing"
+  ],
+  "PED_FOOTPATH_DRIVING": [
+   "riding on the footpath",
+   "driving on the footpath",
+   "rode on the footpath",
+   "drove on the footpath",
+   "bike on the footpath to avoid traffic"
+  ]
+ },
+ "violation_updates": {
+  "ACC_HIT_AND_RUN": {
+   "mv_section": "134 r/w 187"
+  },
+  "ACC_HIT_AND_RUN_RELATED": {
+   "mv_section": "187"
+  },
+  "ACC_CAUSING_DEATH": {
+   "mv_section": "BNS 106(1)"
+  },
+  "DOC_UNDERAGE": {
+   "mv_section": "199A (r/w 4, 181)"
+  }
+ }
+}

@@ -38,7 +38,6 @@ final-sub/
 ├── docs/
 └── scripts/
     ├── verify.sh             # Run tests without starting servers
-    └── setup-ollama.sh       # Legacy Ollama-only launcher (optional)
 ```
 
 ---
@@ -319,16 +318,6 @@ Or open `docs/visualizations/drivelegal_graph_3d.html` locally.
 ## 12. Optional: web PWA
 
 With backend running: `http://127.0.0.1:8000/` (serves `apps/web/`).
-
----
-
-## 13. Optional: legacy Ollama setup
-
-Older flow using **local Ollama** instead of Groq (not required for current demo):
-
-```bash
-bash scripts/setup-ollama.sh
-```
 
 ---
 

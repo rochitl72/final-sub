@@ -9,7 +9,7 @@ back-fills missing lat/lng from its twin, and removes the twin's node, edges
 and spatial entry. Idempotent.
 
 Run:  python3 scripts/dedupe_cities.py
-Then: python3 scripts/build_offline_bundle.py && python3 scripts/build_cities.py
+Then: python3 scripts/build_offline_bundle.py
 """
 import json
 from collections import defaultdict

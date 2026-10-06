@@ -146,8 +146,15 @@ export function useAiConnectivity(onFallback?: (reason: FallbackReason) => void)
   // Track consecutive failed checks before declaring no_server
   const failStreak       = useRef(0);
 
+  // Keep the latest callback in a ref so callers can pass an inline arrow
+  // without re-creating emitFallback → runCheck → the polling effect on every
+  // render (that loop fired thousands of /api/health calls per minute on web).
+  const onFallbackRef = useRef(onFallback);
+  onFallbackRef.current = onFallback;
+
   const emitFallback = useCallback(
     (next: AiConnectivityState) => {
+      const onFallback = onFallbackRef.current;
       if (!onFallback) return;
       const reason = fallbackReason(
         next.connectivity,
@@ -164,7 +171,7 @@ export function useAiConnectivity(onFallback?: (reason: FallbackReason) => void)
       lastFallbackKey.current = key;
       onFallback(reason);
     },
-    [onFallback],
+    [],
   );
 
   // Apply a state change with smart debouncing:

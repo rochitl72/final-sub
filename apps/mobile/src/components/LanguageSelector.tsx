@@ -46,13 +46,16 @@ export function LanguageTrigger({ isOnline, onLanguageChange }: Props) {
       >
         <LinearGradient
           colors={isOnline ? [language.color + '33', language.color + '18'] : ['#0a1628', '#0a1628']}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         />
         <View style={[styles.triggerBorder, { borderColor: isOnline ? language.color + '66' : Colors.navyBorder }]} />
         <Text style={[styles.triggerScript, { color: isOnline ? language.color : Colors.gray }]}>
           {language.script}
         </Text>
+        <View style={styles.globeBadge}>
+          <Ionicons name="globe-outline" size={9} color={isOnline ? language.color : Colors.gray} />
+        </View>
         {!isOnline && (
           <View style={styles.offlineDot} />
         )}
@@ -107,14 +110,14 @@ function LanguageSelectorModal({
     >
       {/* Backdrop */}
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={StyleSheet.absoluteFillObject} />
+        <View style={StyleSheet.absoluteFill} />
       </Pressable>
 
       {/* Sheet */}
       <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
         <LinearGradient
           colors={['#050d1f', '#0a1628']}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
         <View style={styles.sheetBorder} />
 
@@ -131,7 +134,7 @@ function LanguageSelectorModal({
         </View>
 
         <Text style={styles.sheetSub}>
-          Powered by Sarvam AI · All fines & chat replies translated instantly
+          Sarvam AI (or Groq) · All fines & chat replies translated instantly
         </Text>
 
         {/* Language grid */}
@@ -151,7 +154,7 @@ function LanguageSelectorModal({
                 {isSelected && (
                   <LinearGradient
                     colors={[lang.color + '22', lang.color + '0a']}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                   />
                 )}
                 {/* Script badge */}
@@ -199,7 +202,7 @@ const styles = StyleSheet.create({
   },
   triggerDim: { opacity: 0.5 },
   triggerBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: Radius.md,
     borderWidth:  1,
   },
@@ -207,6 +210,11 @@ const styles = StyleSheet.create({
     fontSize:   14,
     fontWeight: '700' as const,
     lineHeight: 18,
+  },
+  globeBadge: {
+    position:        'absolute',
+    bottom:          2,
+    right:           2,
   },
   offlineDot: {
     position:        'absolute',
@@ -236,9 +244,11 @@ const styles = StyleSheet.create({
     overflow:         'hidden',
     paddingBottom:    Platform.OS === 'ios' ? 32 : 16,
     maxHeight:        '80%',
+    // Desktop browsers: a centred sheet instead of a full-width strip
+    ...(Platform.OS === 'web' ? { maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' } : null),
   },
   sheetBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderTopLeftRadius:  Radius.xl,
     borderTopRightRadius: Radius.xl,
     borderWidth:          1,

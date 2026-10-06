@@ -9,12 +9,11 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  Alert,
   Animated,
   StatusBar,
   Dimensions,
-  Linking,
 } from 'react-native';
+import { Alert } from '../services/alert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
@@ -24,14 +23,12 @@ import { sessionsApi, Session } from '../services/api';
 import { useChatStore } from '../store/chatStore';
 import { useAuthStore } from '../store/authStore';
 import { SessionCard } from '../components/SessionCard';
+import { useGlobalSearchParams } from 'expo-router';
 import { Logo } from '../components/Brand';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { shouldShowBanner } from '../services/updateService';
 
 const { width: W } = Dimensions.get('window');
-
-// Mode 3 — On-device AI lives in the PWA (WebLLM needs the browser's WebGPU).
-const SLM_URL = 'https://drivelegal-ai-r72.netlify.app';
 
 // ── Mode selector ─────────────────────────────────────────────────────────────
 
@@ -56,14 +53,14 @@ function ModeSelector({ selected, onChange }: ModeSelectorProps) {
   // Pill slides only between the two real session modes (3 equal segments).
   const left = slideX.interpolate({
     inputRange: [0, 1],
-    outputRange: ['1.3%', '34.3%'],
+    outputRange: ['1.3%', '50.2%'],
   });
 
   return (
     <View style={ms.wrap}>
       {/* Sliding pill */}
       <Animated.View style={[ms.pill, { left }]}>
-        <LinearGradient colors={Gradients.blueGlow} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={Gradients.blueGlow} style={StyleSheet.absoluteFill} />
       </Animated.View>
       {/* Labels */}
       <TouchableOpacity style={ms.tab} onPress={() => select('static')}>
@@ -81,11 +78,6 @@ function ModeSelector({ selected, onChange }: ModeSelectorProps) {
           color={selected === 'dynamic' ? Colors.white : Colors.gray}
         />
         <Text style={[ms.tabText, selected === 'dynamic' && ms.tabTextActive]}>AI Chat</Text>
-      </TouchableOpacity>
-      {/* Mode 3 — On-device AI (opens the offline WebLLM PWA in the browser) */}
-      <TouchableOpacity style={ms.tab} onPress={() => Linking.openURL(SLM_URL)}>
-        <Ionicons name="hardware-chip-outline" size={15} color={Colors.accent} />
-        <Text style={[ms.tabText, { color: Colors.accent }]}>On-device</Text>
       </TouchableOpacity>
     </View>
   );
@@ -107,7 +99,7 @@ const ms = StyleSheet.create({
     position:     'absolute',
     top:          3,
     bottom:       3,
-    width:        '31.7%',
+    width:        '48.5%',
     borderRadius: Radius.md,
     overflow:     'hidden',
   },
@@ -163,6 +155,7 @@ const es = StyleSheet.create({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const activeSessionId = (useGlobalSearchParams<{ sessionId?: string }>().sessionId as string) || null;
   const { user, clearAuth, ensureDeviceAuth } = useAuthStore();
   const { sessions, setSessions, setActiveSession, removeSession, setLoadingSessions, isLoadingSessions } = useChatStore();
 
@@ -234,6 +227,8 @@ export default function HomeScreen() {
           style: 'destructive',
           onPress: async () => {
             removeSession(session.id);
+            // Desktop two-pane: don't leave the deleted chat open on the right
+            if (session.id === activeSessionId) router.replace('/(app)/home');
             try { await sessionsApi.delete(session.id); } catch { /* offline */ }
           },
         },
@@ -258,7 +253,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <LinearGradient colors={Gradients.navyDeep} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={Gradients.navyDeep} style={StyleSheet.absoluteFill} />
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <View style={styles.header}>
@@ -320,7 +315,7 @@ export default function HomeScreen() {
         renderItem={({ item }) => (
           <SessionCard
             session={item}
-            isActive={false}
+            isActive={item.id === activeSessionId}
             onPress={() => handleOpenSession(item)}
             onDelete={() => handleDeleteSession(item)}
           />

@@ -60,7 +60,7 @@ export function FineCard({ card, detailTable }: Props) {
         {/* Header */}
         <View style={fc.header}>
           <View style={fc.headerIconWrap}>
-            <LinearGradient colors={Gradients.blueGloss} style={StyleSheet.absoluteFillObject} />
+            <LinearGradient colors={Gradients.blueGloss} style={StyleSheet.absoluteFill} />
             <MaterialCommunityIcons name="scale-balance" size={18} color={Colors.white} />
           </View>
           <View style={fc.headerText}>

@@ -18,13 +18,15 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Dimensions,
   Platform,
 } from 'react-native';
+import { Alert } from '../services/alert';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import MapView, { Marker, Region, PROVIDER_DEFAULT } from 'react-native-maps';
+import { IndiaMap } from './IndiaMap';
+import { useDesktop } from '../hooks/useDesktop';
+type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
 import * as Location from 'expo-location';
 
 import { Colors, Gradients, Typography, Spacing, Radius } from '../theme';
@@ -75,6 +77,7 @@ export function LocationModal({
   onManual,
   onPin,
 }: LocationModalProps) {
+  const desktop = useDesktop();
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
   useEffect(() => {
@@ -185,12 +188,12 @@ export function LocationModal({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={s.overlay}>
-        <View style={s.sheet}>
+    <Modal visible={visible} animationType={desktop ? 'fade' : 'slide'} transparent onRequestClose={onClose}>
+      <View style={[s.overlay, desktop && s.overlayDesktop]}>
+        <View style={[s.sheet, desktop && s.sheetDesktop]}>
           <LinearGradient
             colors={['rgba(8,18,45,0.99)', 'rgba(4,10,24,1)']}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
 
           {/* Drag handle */}
@@ -232,7 +235,7 @@ export function LocationModal({
                   {isActive && (
                     <LinearGradient
                       colors={Gradients.blueGloss}
-                      style={StyleSheet.absoluteFillObject}
+                      style={StyleSheet.absoluteFill}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                     />
@@ -267,7 +270,7 @@ export function LocationModal({
                     <View style={s.gpsOrb}>
                       <LinearGradient
                         colors={['rgba(37,99,235,0.25)', 'rgba(37,99,235,0.05)']}
-                        style={StyleSheet.absoluteFillObject}
+                        style={StyleSheet.absoluteFill}
                       />
                       <MaterialCommunityIcons name="crosshairs-gps" size={34} color={Colors.bluePale} />
                     </View>
@@ -298,7 +301,7 @@ export function LocationModal({
                   <View style={s.detectedCard}>
                     <View style={s.detectedCardGlow} />
                     <View style={s.detectedPinDot}>
-                      <LinearGradient colors={Gradients.blueGloss} style={StyleSheet.absoluteFillObject} />
+                      <LinearGradient colors={Gradients.blueGloss} style={StyleSheet.absoluteFill} />
                       <Ionicons name="location" size={16} color={Colors.white} />
                     </View>
                     <View style={s.detectedInfo}>
@@ -358,26 +361,7 @@ export function LocationModal({
               {/* Map */}
               {mapExpanded && (
                 <View style={s.mapWrapper}>
-                  <MapView
-                    style={s.map}
-                    initialRegion={INDIA_REGION}
-                    onPress={handleMapPress}
-                    showsUserLocation
-                    showsCompass
-                    showsScale
-                    provider={PROVIDER_DEFAULT}
-                    mapType="standard"
-                  >
-                    {pinCoord && (
-                      <Marker
-                        coordinate={pinCoord}
-                        draggable
-                        onDragEnd={handleMapPress}
-                        title={pinLabel || 'Selected location'}
-                        pinColor={Colors.blueVibrant}
-                      />
-                    )}
-                  </MapView>
+                  <IndiaMap style={s.map} initialRegion={INDIA_REGION} pin={pinCoord} pinLabel={pinLabel} onPress={handleMapPress} />
 
                   {/* "Tap the map" overlay — shown until first pin */}
                   {!pinCoord && (
@@ -539,6 +523,9 @@ const s = StyleSheet.create({
     justifyContent:  'flex-end',
     backgroundColor: 'rgba(0,0,0,0.75)',
   },
+  // Desktop web: a centred dialog instead of a bottom sheet (same content).
+  overlayDesktop: { justifyContent: 'center', alignItems: 'center' },
+  sheetDesktop:   { width: 640, maxWidth: '94%' as any, borderRadius: Radius.xxl, borderBottomWidth: 1, maxHeight: '88%' as any },
   sheet: {
     borderTopLeftRadius:  Radius.xxl,
     borderTopRightRadius: Radius.xxl,
@@ -739,7 +726,7 @@ const s = StyleSheet.create({
     height: '100%',
   },
   mapHintOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems:     'flex-end',
     justifyContent: 'flex-end',
     padding:        Spacing.sm,

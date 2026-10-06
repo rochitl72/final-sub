@@ -13,7 +13,7 @@ export default function Index() {
   if (!isReady) {
     return (
       <View style={styles.boot}>
-        <LinearGradient colors={Gradients.loginHero} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={Gradients.loginHero} style={StyleSheet.absoluteFill} />
       </View>
     );
   }

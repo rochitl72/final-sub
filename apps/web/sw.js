@@ -12,7 +12,7 @@
  */
 
 const TILE_CACHE  = "drivelegal-tiles-v1";
-const SHELL_CACHE = "drivelegal-shell-v11";  // bumped: offline guardrail + follow-ups, deduped cities
+const SHELL_CACHE = "drivelegal-shell-v12";  // bumped: on-device AI (WebLLM) removed, scenario cards
 const API_CACHE   = "drivelegal-api-v4";  // bumped: deduped city catalog
 const TILE_HOSTS  = [
   "tile.openstreetmap.org",
@@ -29,9 +29,6 @@ const SHELL_URLS = [
   "/logo.png",
   "/sw.js",
   "/offline.bundle.js",   // on-device engine — required for airplane-mode chat
-  "/slm.html",            // on-device AI (WebLLM) mode page
-  "/drivelegal_cities.json", // offline GPS / map / city lookup for the SLM page
-  "/webllm.bundle.js",    // self-hosted WebLLM loader — makes the model work offline after reload
 ];
 
 const CATALOG_URLS = [

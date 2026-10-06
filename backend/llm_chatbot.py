@@ -492,3 +492,38 @@ def check_groq_status() -> bool:
     if not avail:
         return False
     return _resolve_model(key, refresh=True) in avail
+
+
+# ── Translation fallback (used when Sarvam is missing / out of credits) ──────
+_LANG_NAMES = {
+    "hi-IN": "Hindi", "ta-IN": "Tamil", "te-IN": "Telugu", "kn-IN": "Kannada",
+    "ml-IN": "Malayalam", "bn-IN": "Bengali", "mr-IN": "Marathi",
+    "gu-IN": "Gujarati", "pa-IN": "Punjabi", "od-IN": "Odia", "en-IN": "English",
+}
+_translate_cache: Dict[tuple, str] = {}
+
+
+def groq_translate(text: str, target_language: str, source_language: str = "en-IN") -> str:
+    """Translate with the Groq LLM. Keeps numbers, ₹ amounts, section numbers and
+    Markdown intact. Raises GroqOfflineError / RuntimeError on failure."""
+    if not text.strip() or target_language == source_language:
+        return text
+    key = (text, target_language, source_language)
+    if key in _translate_cache:
+        return _translate_cache[key]
+    tgt = _LANG_NAMES.get(target_language, target_language)
+    src = _LANG_NAMES.get(source_language, source_language)
+    messages = [
+        {"role": "system", "content": (
+            f"You translate Indian road-law answers from {src} to {tgt}. "
+            "Use simple, everyday spoken language in the native script. "
+            "Keep every number, ₹ amount, section/rule number (e.g. s.194D), "
+            "vehicle registration, and Markdown formatting (**bold**, bullets, line breaks) exactly. "
+            "Output ONLY the translation — no notes, no quotes.")},
+        {"role": "user", "content": text[:4000]},
+    ]
+    out = _call_groq(messages, max_tokens=1500, temperature=0.1, json_mode=False)
+    if len(_translate_cache) > 2000:
+        _translate_cache.clear()
+    _translate_cache[key] = out
+    return out

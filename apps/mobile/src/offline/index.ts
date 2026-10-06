@@ -7,14 +7,11 @@
  */
 
 import type { SessionState, TurnResponse } from '../services/api';
-import { isUnsafeRequest, narrate, OfflineResult, OfflineSession, SEGMENT_FINE_CLASS } from './offlineEngine';
-import { narrateWithSLM } from './slm';
+import { narrate, OfflineResult, OfflineSession, SEGMENT_FINE_CLASS } from './offlineEngine';
 
 export { narrate } from './offlineEngine';
 export { resolve, isDeterministic } from './resolver';
 export { quickFine, getViolation } from './graph';
-export { setOnDeviceLLM, onDeviceLLMReady } from './slm';
-export type { OnDeviceLLM } from './slm';
 
 function toOffline(s: SessionState | null): OfflineSession {
   if (!s) return {};
@@ -42,12 +39,8 @@ export async function localTurn(
   text: string,
 ): Promise<TurnResponse> {
   const offlineSession = toOffline(state);
-  // Tier 2: on-device neural model (if a runtime is registered). Falls back to
-  // Tier 3 deterministic engine otherwise. Fine amounts stay graph-exact.
-  // Safety-guardrail requests never reach the generative model.
-  const r: OfflineResult = isUnsafeRequest(text)
-    ? narrate(offlineSession, text)
-    : (await narrateWithSLM(offlineSession, text)) ?? narrate(offlineSession, text);
+  // Rule-based offline engine: fine amounts always come from the local graph.
+  const r: OfflineResult = narrate(offlineSession, text);
 
   const nextState: SessionState = {
     ...(state as SessionState),

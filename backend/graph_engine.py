@@ -41,6 +41,7 @@ from typing import Optional
 
 _HERE       = Path(__file__).parent
 _GRAPH_PATH = _HERE.parent / "data" / "compiled" / "drivelegal_graph.json"
+_DB_PATH = _HERE.parent / "data" / "drivelegal.db"
 
 _engine_instance = None
 _lock = threading.Lock()
@@ -195,21 +196,30 @@ class GraphEngine:
     """
 
     def __init__(self, graph_path: Optional[Path] = None):
+        g = None
+        if graph_path is None and _DB_PATH.exists():
+            # SQLite is the source of truth (data/drivelegal.db); the JSON file is
+            # a compiled artefact for the phone bundle and fallback.
+            import legal_db
+            print(f"[graph_engine] Loading {_DB_PATH.name} …", flush=True)
+            g = legal_db.export_graph()
         path = graph_path or _GRAPH_PATH
-        if not path.exists():
+        if g is None and not path.exists():
             raise FileNotFoundError(
                 f"Graph not found: {path}\n"
                 "The compiled graph is shipped with this repo at "
                 "drivelegal/data/compiled/drivelegal_graph.json — re-clone or restore it."
             )
-        print(f"[graph_engine] Loading {path.name} …", flush=True)
-        g = json.loads(path.read_text(encoding="utf-8"))
+        if g is None:
+            print(f"[graph_engine] Loading {path.name} …", flush=True)
+            g = json.loads(path.read_text(encoding="utf-8"))
 
         self.nodes:   dict = g["nodes"]
         self.edges:   list = g["edges"]
         self.spatial        = g["spatial"]
         self.indexes        = g["indexes"]
         self.meta           = g["meta"]
+        self.law            = g.get("law") or {}
 
         # Adjacency lists
         self.adj: dict = {}

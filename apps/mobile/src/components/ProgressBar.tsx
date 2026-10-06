@@ -47,7 +47,7 @@ export function ProgressBar({ sessionState }: Props) {
                 filled ? styles.dotFilled : active ? styles.dotActive : styles.dotEmpty,
               ]}>
                 {filled && (
-                  <LinearGradient colors={Gradients.blueGloss} style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient colors={Gradients.blueGloss} style={StyleSheet.absoluteFill} />
                 )}
                 <StepIcon
                   lib={step.lib}
@@ -69,7 +69,7 @@ export function ProgressBar({ sessionState }: Props) {
       {/* Progress track — plain View, no Animated.Value */}
       <View style={styles.track}>
         <View style={[styles.fill, { width: pct }]}>
-          <LinearGradient colors={Gradients.blueGlow} style={StyleSheet.absoluteFillObject} />
+          <LinearGradient colors={Gradients.blueGlow} style={StyleSheet.absoluteFill} />
         </View>
       </View>
     </View>

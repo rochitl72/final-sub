@@ -4,17 +4,18 @@
  * Tap to hear a message read aloud in the user's selected language.
  * States: idle (speaker) → loading (spinner) → playing (pause/stop)
  *
- * Uses expo-av for playback and expo-file-system to write the WAV temp file.
+ * Uses expo-audio for playback and expo-file-system to write the WAV temp file.
  * Online-only: invisible when isOnline=false.
  */
 
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 // SDK 54+: cacheDirectory / writeAsStringAsync live under /legacy only
 import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,8 +33,42 @@ interface Props {
 }
 
 // Global sound ref so only one TTS plays at a time across all bubbles
-let _currentSound: Audio.Sound | null = null;
+let _currentSound: AudioPlayer | null = null;
 let _currentStop:  (() => void) | null = null;
+
+// ── Web playback helpers ────────────────────────────────────────────────────
+// expo-file-system has no cache dir in the browser, so on web we play Sarvam's
+// WAV from a data: URL, and fall back to the browser's own speech engine when
+// Sarvam is unavailable (no key / no credits).
+const IS_WEB = Platform.OS === 'web';
+let _webAudio: any = null;
+
+function webHasSpeech(): boolean {
+  return IS_WEB && typeof window !== 'undefined' && 'speechSynthesis' in window;
+}
+
+function webStop() {
+  try { _webAudio?.pause(); } catch { /* ignore */ }
+  _webAudio = null;
+  try { if (webHasSpeech()) window.speechSynthesis.cancel(); } catch { /* ignore */ }
+}
+
+function webSpeak(text: string, lang: string, onEnd: () => void): boolean {
+  if (!webHasSpeech()) return false;
+  const synth = window.speechSynthesis;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang === 'od-IN' ? 'or-IN' : lang;
+  const base = u.lang.slice(0, 2);
+  const voice = synth.getVoices().find(v => v.lang === u.lang)
+             ?? synth.getVoices().find(v => v.lang.startsWith(base));
+  if (voice) u.voice = voice;
+  u.rate = 0.95;
+  u.onend = onEnd;
+  u.onerror = onEnd;
+  synth.cancel();
+  synth.speak(u);
+  return true;
+}
 
 /** True when text is mostly Latin — needs translate before non-English TTS. */
 function isMostlyLatin(text: string): boolean {
@@ -45,15 +80,16 @@ function isMostlyLatin(text: string): boolean {
 
 export function TtsButton({ text, isOnline, onError }: Props) {
   const [ttsState, setTtsState] = useState<TtsState>('idle');
-  const soundRef   = useRef<Audio.Sound | null>(null);
+  const soundRef   = useRef<AudioPlayer | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { language } = useLanguageStore();
 
   const stopCurrent = useCallback(async () => {
+    if (IS_WEB) webStop();
     try {
       if (_currentSound) {
-        await _currentSound.stopAsync();
-        await _currentSound.unloadAsync();
+        _currentSound.pause();
+        _currentSound.remove();
         _currentSound = null;
       }
     } catch { /* ignore */ }
@@ -62,7 +98,7 @@ export function TtsButton({ text, isOnline, onError }: Props) {
   }, []);
 
   const handlePress = useCallback(async () => {
-    if (!isOnline) return;
+    if (!isOnline && !webHasSpeech()) return;
 
     // If this button is playing, stop it
     if (ttsState === 'playing') {
@@ -86,7 +122,31 @@ export function TtsButton({ text, isOnline, onError }: Props) {
         if (translated.trim()) speakText = translated.slice(0, 800);
       }
 
-      const tts = await textToSpeech(speakText, speakLang);
+      const tts = isOnline ? await textToSpeech(speakText, speakLang)
+                           : { ok: false, audioBase64: null as string | null, errorMessage: undefined };
+
+      if (IS_WEB) {
+        const done = () => {
+          setTtsState('idle');
+          if (_currentStop === done) _currentStop = null;
+        };
+        if (tts.ok && tts.audioBase64) {
+          const audio = new (window as any).Audio(`data:audio/wav;base64,${tts.audioBase64}`);
+          _webAudio = audio;
+          audio.onended = done;
+          _currentStop = done;
+          await audio.play();
+          setTtsState('playing');
+          return;
+        }
+        // Sarvam unavailable → browser voice
+        if (webSpeak(speakText, speakLang, done)) {
+          _currentStop = done;
+          setTtsState('playing');
+          return;
+        }
+      }
+
       if (!tts.ok || !tts.audioBase64) {
         setTtsState('error');
         onError?.(tts.errorMessage ?? '🔇 Voice unavailable — check server Sarvam setup');
@@ -106,32 +166,23 @@ export function TtsButton({ text, isOnline, onError }: Props) {
       });
 
       // Load and play
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS:   false,
-        playsInSilentModeIOS: true,
-      });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: tmpUri },
-        { shouldPlay: true },
-      );
-
-      soundRef.current  = sound;
-      _currentSound     = sound;
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      const player = createAudioPlayer({ uri: tmpUri });
+      soundRef.current  = player;
+      _currentSound     = player;
       _currentStop      = () => setTtsState('idle');
 
-      setTtsState('playing');
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
+      player.addListener('playbackStatusUpdate', (status) => {
         if (status.didJustFinish) {
           setTtsState('idle');
           _currentSound = null;
           _currentStop  = null;
-          sound.unloadAsync().catch(() => {});
-          // Clean up temp file
+          try { player.remove(); } catch { /* ignore */ }
           FileSystem.deleteAsync(tmpUri, { idempotent: true }).catch(() => {});
         }
       });
+      player.play();
+      setTtsState('playing');
     } catch (err) {
       console.warn('[TtsButton] playback failed', err);
       setTtsState('error');
@@ -141,7 +192,7 @@ export function TtsButton({ text, isOnline, onError }: Props) {
     }
   }, [isOnline, ttsState, text, language.code, stopCurrent, onError]);
 
-  if (!isOnline) return null;
+  if (!isOnline && !webHasSpeech()) return null;
 
   return (
     <TouchableOpacity
