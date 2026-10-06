@@ -21,6 +21,7 @@ export interface ChatMessage {
   allow_other?:  boolean;
   fine_card?:   FineCard;
   scenario?:    any;      // multi-person breakdown from the Scenario Engine
+  replace_last?: boolean; // this answer supersedes the previous one (clarification / correction)
   detail_table?: DetailRow[];
   explanation?: Explanation;
   allow_text?:  boolean;
@@ -56,6 +57,23 @@ interface ChatState {
 
 let _msgId = 0;
 export function newMsgId() { return `msg_${Date.now()}_${++_msgId}`; }
+
+/**
+ * Append an assistant message. When it is an update to the previous answer
+ * (a clarification was answered, a fact corrected), the old answer is removed
+ * so the conversation shows ONE answer that changes — not a new copy per tap.
+ */
+export function withAnswer(messages: ChatMessage[], msg: ChatMessage): ChatMessage[] {
+  if (!msg.replace_last) return [...messages, msg];
+  let i = messages.length - 1;
+  for (; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role === 'assistant' && !m.pending && (m.scenario || m.fine_card || m.chips?.length)) break;
+  }
+  if (i < 0) return [...messages, msg];
+  const rest = [...messages.slice(0, i), ...messages.slice(i + 1)];
+  return [...rest, msg];
+}
 
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions:          [],
@@ -106,7 +124,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       session_state, reply, question, chips, multi_select,
       selection_mode, allow_other,
       fine_card, detail_table, explanation, allow_text, intent, slot, scenario,
-    } = resp;
+      replace_last,
+    } = resp as any;
     const content = reply || question || '';
     // Skip empty no-op turns so we don't render blank bubbles.
     if (content || fine_card || chips?.length) {
@@ -120,6 +139,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         allow_other:    allow_other,
         fine_card:      fine_card,
         scenario:       scenario,
+        replace_last:   !!replace_last,
         detail_table:   detail_table,
         explanation:    explanation,
         allow_text:     allow_text,
@@ -128,7 +148,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ts:             Date.now(),
         pending:        false,
       };
-      set((s) => ({ messages: [...s.messages, msg] }));
+      set((s) => ({ messages: withAnswer(s.messages, msg) }));
     }
     if (session_state) {
       set({ sessionState: session_state });

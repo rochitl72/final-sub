@@ -11,6 +11,7 @@ Deterministic legal reasoning over a Scenario.
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from .kb import SEVERITY_RANK, get_kb
@@ -506,8 +507,26 @@ class Reasoner:
             f["provisions"] = [p["ref"] for p in self.kb.vprov.get(f["code"], [])]
 
     # ── 8. assemble ───────────────────────────────────────────────────────
+    # Damage from the crash ("my tail light is broken") is not an equipment offence.
+    _DAMAGE_RE = re.compile(r"\b(broke|broken|damaged?|smashed|cracked|dented|bent|shattered|scratched)\b", re.I)
+    _EQUIPMENT_GROUPS = {"modifications_and_compliance", "emission_and_noise"}
+
+    def drop_crash_damage(self) -> None:
+        if not self.facts.get("collision"):
+            return
+        keep = []
+        for e in self.scn["events"]:
+            if not e.get("derived") and self._DAMAGE_RE.search(e.get("text") or ""):
+                e["offences"] = [c for c in e["offences"]
+                                 if (self.kb.violation(c) or {}).get("grp") not in self._EQUIPMENT_GROUPS]
+                if not e["offences"]:
+                    continue
+            keep.append(e)
+        self.scn["events"] = keep
+
     def run(self) -> dict:
         self.normalise()
+        self.drop_crash_damage()
         self.triggers()
         self.assign()
         self.relations()

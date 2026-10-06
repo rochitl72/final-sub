@@ -677,6 +677,17 @@ class DialogManager:
         ids = set(chip_ids or [])
         pending = s.get("pending_slot") or s.get("pending_multi")
 
+        # ── Answer to the Scenario Engine's own question ("Was anyone hurt?") ──
+        if s.get("scenario_q") and any(i.startswith("free:") for i in ids):
+            try:
+                from scenario.engine import chip_answer_turn
+                sc = chip_answer_turn(s, list(chip_ids or []))
+            except Exception:
+                sc = None
+            if sc is not None:
+                sc["session_state"] = _summary(s)
+                return sc
+
         from clarification_engine import UNSURE_FREEFORM_PROMPT
 
         # ── "I'm not sure" ────────────────────────────────────────────────────
@@ -813,13 +824,14 @@ class DialogManager:
 
             if not (s.get("repeat_offender") or s.get("has_licence") is False
                     or (isinstance(s.get("driver_age"), int) and s["driver_age"] < 18)):
-                # Nothing ticked → the answer above already stands; don't repeat the card.
-                card = s.get("last_fine_card") or {}
-                amt = f"₹{int(card['fine_first']):,}" if card.get("fine_first") else "the fine above"
-                reply = f"Got it — nothing extra applies, so {amt} (first offence) is what you'd pay."
-                s.setdefault("messages", []).append({"role": "assistant", "content": reply})
-                return {"intent": "narrate", "reply": reply, "fine_card": None, "chips": None,
-                        "session_state": _summary(s)}
+                # Nothing ticked → same answer, now final (checklist removed, no
+                # second copy of the card).
+                out = self._dynamic_answer_for_violation(s, with_followup=False)
+                out["reply"] = (out.get("reply", "").rstrip()
+                                + "\n\nNothing extra applies — this is the fine you'd pay (first offence).")
+                out["replace_last"] = True
+                out["session_state"] = _summary(s)
+                return out
 
             out = self._dynamic_answer_for_violation(s, with_followup=False)
 
@@ -848,6 +860,7 @@ class DialogManager:
                 out["reply"] = (out.get("reply", "").rstrip() + "\n\n" + " ".join(extras))
                 s["messages"].append({"role": "assistant", "content": out["reply"]})
 
+            out["replace_last"] = True
             out["session_state"] = _summary(s)
             return out
 

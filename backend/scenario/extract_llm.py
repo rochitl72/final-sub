@@ -114,6 +114,10 @@ _NEEDS = [
     ("EMIT_OLD_DIESEL", r"diesel|petrol|\bncr\b|delhi|\bold (car|vehicle|truck|bike|bus)\b|years? old (car|vehicle|truck|bus)"),
     ("EMIT_BS", r"\bbs\b|bs-?(iv|vi|6|4)|emission|banned|\bncr\b|delhi"),
     ("SCHOOL_BUS", r"school"), ("COMM_SCHOOL_BUS", r"school"),
+    # "hit me at a signal" is not signal jumping — the story must say the light was jumped / red
+    ("SIGNAL_RED", r"\bred\b|jump\w*|\bran\b.{0,15}(signal|light)|\bbroke\b.{0,15}(signal|light)|"
+                   r"skip\w*.{0,15}(signal|light)|cross\w*.{0,15}(signal|light)|signal (jump|break)\w*|"
+                   r"without stopping"),
     ("EV_", r"\bev\b|electric|charg|battery|retrofit"),
     ("FASTAG", r"fastag|fast tag|toll"), ("TOLL", r"toll|fastag"),
     ("MOD_BULL_BARS", r"bull|crash.?guard"), ("MOD_LASER", r"jammer|radar|laser"),

@@ -41,7 +41,13 @@ export function MultiSelect({
   const toggle = (id: string) => {
     if (done) return;
     if (isSingle) {
+      // Radio question: one tap answers it — no separate Proceed press.
       setSelected({ [id]: true });
+      if (id !== OTHER_ID) {
+        setDone(true);
+        onProceed?.();
+        onSubmit([id]);
+      }
       return;
     }
     if (id === NONE_ID) {
@@ -115,8 +121,9 @@ export function MultiSelect({
       })}
 
       {!done && !canProceed && (
-        <Text style={s.hintText}>Select at least one option above</Text>
+        <Text style={s.hintText}>{isSingle ? 'Tap an option to answer' : 'Select at least one option above'}</Text>
       )}
+      {(!isSingle || otherOn) && (
       <TouchableOpacity
         style={[s.proceedBtn, !canProceed && s.proceedDisabled, done && s.proceedDone]}
         activeOpacity={0.9}
@@ -130,6 +137,7 @@ export function MultiSelect({
           <Ionicons name="arrow-forward" size={14} color={Colors.white} />
         )}
       </TouchableOpacity>
+      )}
     </View>
   );
 }

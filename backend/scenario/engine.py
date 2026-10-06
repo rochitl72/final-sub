@@ -106,8 +106,14 @@ def _render(session: dict, text: str, scn: dict, *, lead: str = "", intent: str 
     session.setdefault("messages", []).append({"role": "user", "content": text})
     session["messages"].append({"role": "assistant", "content": reply})
     payload["source"] = scn.get("source")
+    chips = [{"id": c["id"], "label": c["label"]} for c in (q or {}).get("chips", [])] or None
     return {"intent": intent, "reply": reply, "fine_card": uniq[0] if uniq else None,
-            "fine_cards": uniq, "chips": [{"id": c["id"], "label": c["label"]} for c in (q or {}).get("chips", [])] or None,
+            "fine_cards": uniq, "chips": chips,
+            # One tap answers the question (radio, not checkboxes).
+            "selection_mode": "single" if chips else None,
+            # An update rewrites the previous answer in place instead of adding
+            # a second, near-identical one under it.
+            "replace_last": intent == "scenario_update",
             "allow_text": True, "scenario": payload, "detail_table": None, "explanation": None}
 
 
@@ -194,7 +200,9 @@ def maybe_handle(session: dict, text: str) -> Optional[dict]:
             scn = copy.deepcopy(session["scenario"])
             planner.apply_answer(scn, q, value)
             session.setdefault("scenario_asked", []).append(f"{q['fact']}@{q.get('subject')}")
-            return _render(session, text, scn, intent="scenario_update", previous=session.get("scenario_sig"))
+            label = next((c["label"] for c in q.get("chips", []) if c.get("value") == value), None) or text
+            return _render(session, text, scn, intent="scenario_update", previous=session.get("scenario_sig"),
+                           lead=f"**{q.get('question') or 'Answer'}** → {label}.")
 
     # 2. A correction to the current scenario.
     if session.get("scenario") and _EDIT_RE.search(text):
@@ -267,3 +275,17 @@ def driver_context_turn(session: dict, *, repeat: bool, minor: bool, no_licence:
     if out is not None:
         session["last_user_story"] = story          # keep the user's own words
     return out
+
+
+def chip_answer_turn(session: dict, chip_ids: list) -> Optional[dict]:
+    """Checkbox/radio submission for the Scenario Engine's own question.
+    Returns None when the ids don't belong to the pending scenario question."""
+    q = session.get("scenario_q")
+    if not q or not session.get("scenario"):
+        return None
+    labels = [c["label"] for c in q.get("chips", []) if c["id"] in set(chip_ids or [])]
+    if not labels:
+        return None
+    # If several were ticked, the most serious option wins (chips are ordered
+    # least → most serious).
+    return maybe_handle(session, labels[-1])

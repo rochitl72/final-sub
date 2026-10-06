@@ -91,6 +91,15 @@ export function ChatBubble({ message, onChipPress, onMultiSubmit, onMcqProceed, 
 
   // Every assistant chip list is a vertical checkbox MCQ — never horizontal pills.
   const showMcq = hasChips && !isUser;
+  const mcqNode = showMcq ? (
+    <MultiSelect
+      options={message.chips!}
+      mode={message.selection_mode === 'single' ? 'single' : 'multi'}
+      allowOther={message.allow_other === true}
+      onSubmit={(ids, otherText) => onMultiSubmit?.(ids, otherText)}
+      onProceed={onMcqProceed}
+    />
+  ) : null;
 
   return (
     <Animated.View
@@ -153,15 +162,7 @@ export function ChatBubble({ message, onChipPress, onMultiSubmit, onMcqProceed, 
           </View>
         )}
 
-        {showMcq && (
-          <MultiSelect
-            options={message.chips!}
-            mode={message.selection_mode === 'single' ? 'single' : 'multi'}
-            allowOther={message.allow_other === true}
-            onSubmit={(ids, otherText) => onMultiSubmit?.(ids, otherText)}
-            onProceed={onMcqProceed}
-          />
-        )}
+        {showMcq && !structured && mcqNode}
 
         {structured && <ScenarioCards scenario={sc} />}
         {structured && !!sc.tail && (
@@ -173,6 +174,10 @@ export function ChatBubble({ message, onChipPress, onMultiSubmit, onMcqProceed, 
         {hasFineCard && !structured && (
           <FineCard card={message.fine_card!} detailTable={message.detail_table} />
         )}
+
+        {/* The clarifying question sits at the end of a structured answer, so the
+            options appear right under "One question so I can be exact: …". */}
+        {showMcq && structured && mcqNode}
       </View>
     </Animated.View>
   );

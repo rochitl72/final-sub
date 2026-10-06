@@ -342,6 +342,7 @@ def _persist_turn_out(sid: str, out: dict, s: dict) -> None:
         "diff":               out.get("diff"),
         "mode":               out.get("mode"),
         "scenario":           out.get("scenario"),
+        "replace_last":       out.get("replace_last") or None,
     }
     # Strip null fields so the JSON stays compact.
     payload = {k: v for k, v in payload.items() if v is not None}

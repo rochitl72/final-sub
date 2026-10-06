@@ -39,7 +39,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Colors, Gradients, Typography, Spacing, Radius, Shadows } from '../theme';
 import { dialogApi, sessionsApi, SessionState, TurnResponse } from '../services/api';
-import { useChatStore, ChatMessage, newMsgId } from '../store/chatStore';
+import { useChatStore, ChatMessage, newMsgId, withAnswer } from '../store/chatStore';
 import { ChatBubble } from '../components/ChatBubble';
 import { ProgressBar } from '../components/ProgressBar';
 import { LocationModal } from '../components/LocationModal';
@@ -214,6 +214,7 @@ export default function ChatScreen() {
         allow_other:    m.payload?.allow_other,
         fine_card:      m.payload?.fine_card,
         scenario:       m.payload?.scenario,
+        replace_last:   !!m.payload?.replace_last,
         detail_table: m.payload?.detail_table,
         explanation:  m.payload?.explanation,
         allow_text:   m.payload?.allow_text,
@@ -222,7 +223,8 @@ export default function ChatScreen() {
         ts:           m.created_at,
         pending:      false,
       }));
-      setMessages(converted);
+      // Collapse superseded answers exactly like the live chat does.
+      setMessages(converted.reduce<ChatMessage[]>((acc, m) => withAnswer(acc, m), []));
       setSessionState(session_state);
       if (session_state?.mode) setCurrentMode(session_state.mode as 'static' | 'dynamic');
       // Kick off the first turn if it's a brand-new session with no messages

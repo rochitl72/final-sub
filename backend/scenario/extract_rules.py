@@ -54,6 +54,10 @@ _PERMITTED_NO = re.compile(r"\b(without (asking|permission|telling)|stole|stolen
 _EXTRA_PAX = re.compile(r"\b(\d{1,3})\s+(extra|more|additional)\s+(people|passengers|persons)\b|"
                         r"\b(carrying|with|had|took)\s+(\d{1,2})\s+(?:school\s+)?(passengers|people|kids|children|students|persons)\b|"
                         r"\b(too many|excess|extra) (people|passengers)\b", re.I)
+_DAMAGE = re.compile(
+    r"\b(my|our)\s+(car|bike|scooter|scooty|vehicle|auto|truck|cycle|bicycle)(?:'?s)?\b.{0,40}?\b"
+    r"(broke|broken|damaged|smashed|dented|cracked|shattered|bent|scratched)\b|"
+    r"\b(broke|broken|damaged|smashed|dented|cracked|shattered)\b.{0,30}?\b(my|our)\s+(car|bike|scooter|vehicle)\b", re.I)
 _OCCUPANTS = [
     (re.compile(r"\b(me and|i and) (two|2) (friends|others|people)\b", re.I), 3),
     (re.compile(r"\b(three|3) of us\b|\btriple\w*\b|\bteen log\b|\bwith his friends\b|\bwith her friends\b", re.I), 3),
@@ -487,6 +491,10 @@ def extract(text: str) -> dict:
         if _VICTIM_CLAUSE.search(cl) and not re.search(r"\b(no|without|not|n't)\b", cl, re.I):
             continue
         if _INNOCENT.search(cl):
+            continue
+        # "my car's tail light is broken" after a crash = damage to the victim's
+        # vehicle, not an equipment offence by anyone.
+        if _DAMAGE.search(cl) and (facts.get("collision") or _COLLISION.search(full)):
             continue
         ranked = [(c, s) for c, s in res.resolve(cl) if c not in _NOISY]
         if not _ABSENCE.search(cl):

@@ -197,6 +197,8 @@ export interface TurnResponse {
   session_id:     string;
   intent:         string;
   scenario?:      any;
+  /** This answer supersedes the previous one (replace it in the chat). */
+  replace_last?:  boolean;
   reply?:         string;
   question?:      string;
   slot?:          string;
