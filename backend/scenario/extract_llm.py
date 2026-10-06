@@ -111,7 +111,8 @@ def extract(text: str, call=None) -> Optional[dict]:
 # Offences that are only plausible when the story mentions their subject at all — stops the model
 # "pattern-matching" a rare code onto an unrelated story (e.g. old-diesel ban on a scooter).
 _NEEDS = [
-    ("EMIT_OLD_DIESEL", r"diesel|petrol|\bncr\b|delhi|\bold (car|vehicle|truck|bike|bus)\b|years? old (car|vehicle|truck|bus)"),
+    ("EMIT_OLD_DIESEL", r"diesel|petrol|\bncr\b|delhi|\bold (car|vehicle|truck|bike|bus)\b|years? old (car|vehicle|truck|bus)|"
+                        r"\b(car|vehicle|truck|bus) is \d+ years"),
     ("EMIT_BS", r"\bbs\b|bs-?(iv|vi|6|4)|emission|banned|\bncr\b|delhi"),
     ("SCHOOL_BUS", r"school"), ("COMM_SCHOOL_BUS", r"school"),
     # "hit me at a signal" is not signal jumping — the story must say the light was jumped / red
@@ -164,6 +165,12 @@ def validate(data: dict, text: str) -> Optional[dict]:
             kin = _KIN_WORD.search(f"{a.get('label', '')} {a.get('evidence', '')}")
             if kin and re.search(rf"\bmy\s+(\d+[- ]?(year|yr)s?[- ]?old\s+)?{kin.group(1)}", text, re.I):
                 rel = kin.group(1).lower()
+        if rel not in ("self", "other"):
+            # "Neighbour's son" is someone else's son — not the user's
+            lab = f"{a.get('label', '')} {a.get('evidence', '')}"
+            if re.search(rf"\b(?!my\b|your\b)\w+'s\s+(?:\d+[- ]?(?:year|yr)s?[- ]?old\s+)?{re.escape(rel)}\b", lab, re.I) \
+                    and not re.search(rf"\bmy\s+(?:\d+[- ]?(?:year|yr)s?[- ]?old\s+)?{re.escape(rel)}\b", text, re.I):
+                rel = "other"
         roles = [r for r in (a.get("roles") or []) if r in ("driver", "rider", "pillion", "passenger", "owner", "guardian",
                                                              "conductor", "operator", "employer", "pedestrian")]
         actors.append({"id": str(a["id"]), "label": (a.get("label") or "Someone")[:40], "relation": rel,
@@ -311,6 +318,12 @@ def merge(llm: dict, rules: dict) -> dict:
                 tgt["age"] = ra_["age"]
             if tgt.get("licence") is None and ra_.get("licence"):
                 tgt["licence"] = ra_["licence"]
+    # a parent the rules found ("his dad's car") but the LLM left out → keep them,
+    # so guardian liability and ownership land on the right person
+    if not any(a.get("relation") == "parent" or "guardian" in (a.get("roles") or []) for a in out["actors"]):
+        for ra_ in rules.get("actors", []):
+            if ra_.get("relation") == "parent":
+                out["actors"].append({**ra_, "id": f"R{ra_['id']}", "vehicle": None})
     # vehicle ownership the rules saw ("my car") → the LLM's matching vehicle
     rv = {v["id"]: v for v in rules.get("vehicles", [])}
     lv = {v["id"]: v for v in out.get("vehicles", [])}

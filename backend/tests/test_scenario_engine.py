@@ -70,6 +70,27 @@ def test_general_question_not_hijacked():
     assert maybe_handle(s, "can the police check my phone?") is None
 
 
+def test_someone_elses_child_is_not_yours():
+    out, rows = findings("My neighbour's 15 year old son crashed his dad's car into our gate.")
+    assert "self" not in rows, rows                                   # the user is not the guardian here
+    assert "DOC_UNDERAGE" in {c for c, _ in rows.get("parent", [])}, rows
+    assert not any(c.startswith("EMIT_") for v in rows.values() for c, _ in v), rows
+
+
+def test_pedestrian_hit_asks_outcome_then_updates():
+    session = {"state_code": "TN", "city_code": "CHN", "city_name": "Chennai", "_force_rules": True}
+    first = maybe_handle(session, "A guy on a scooter hit my mom while she was crossing the road near Marina")
+    assert first is not None and first["chips"], first                # answered here, asks "Was anyone hurt?"
+    second = maybe_handle(session, "she died")
+    assert second["intent"] == "scenario_update" and second["replace_last"], second
+    assert "ACC_CAUSING_DEATH" in {c["violation_code"] for c in second["fine_cards"]}, second
+
+
+def test_crash_damage_is_not_an_offence():
+    out, rows = findings("A bike rammed into my car from behind and drove off. My car's tail light is broken.")
+    assert not any("TAIL" in c or "LIGHT" in c for v in rows.values() for c, _ in v), rows
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in list(globals().items()):

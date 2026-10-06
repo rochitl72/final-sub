@@ -160,6 +160,19 @@ def compose(result: dict, *, city_name: Optional[str], question: Optional[dict],
         payload_people.append(_person_payload(p, "victim"))
 
     tail_start = len(lines)
+    if not offenders and question:
+        # Nothing definite yet — say what hinges on the question instead of an empty answer.
+        pending = [f for f in result.get("conditional", []) if f["code"] in question.get("codes", [])]
+        by_actor: Dict[str, List[str]] = {}
+        for f in pending:
+            names = by_actor.setdefault(f["actor"], [])
+            if f["name"].lower() not in names:
+                names.append(f["name"].lower())
+        for aid, names in by_actor.items():
+            a = actors.get(aid) or {}
+            lines.append("")
+            lines.append(f"**{a.get('label') or 'The other party'}** could face: {' or '.join(names)} — "
+                         "which one depends on your answer below.")
     cond = [f for f in result.get("conditional", []) if not question or f["code"] not in question.get("codes", [])]
     if cond:
         lines.append("")
@@ -235,9 +248,13 @@ def _next_steps(result: dict, asks: List[str], actors: Dict[str, dict], kb) -> L
     steps = []
     me = next((a for a in actors.values() if a.get("relation") == "self"), None)
     hurt = facts.get("outcome") in ("injury", "grievous_injury", "death")
-    if facts.get("collision") and hurt:
-        steps.append("Make sure the injured get medical help (call 112, or 108 for an ambulance) and report the "
-                     "accident at the nearest police station within 24 hours (MV Act §134).")
+    if facts.get("collision") and facts.get("outcome") == "death":
+        steps.append("Report the death at the nearest police station so an FIR is registered (MV Act §134), and "
+                     "keep the post-mortem report and death certificate — they're needed for the case and any claim.")
+    elif facts.get("collision") and (hurt or facts.get("outcome") in (None, "unknown")):
+        steps.append(("Make sure the injured get medical help" if hurt else "If anyone is hurt, get medical help first")
+                     + " (call 112, or 108 for an ambulance) and report the accident at the nearest police "
+                     "station within 24 hours (MV Act §134).")
     if facts.get("fled") and me and me.get("is_victim"):
         steps.append("Note the other vehicle's number, colour and direction, keep photos and any CCTV/dashcam "
                      "footage, and file a complaint or FIR at the police station.")

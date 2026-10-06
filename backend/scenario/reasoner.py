@@ -228,6 +228,24 @@ class Reasoner:
         agent = self._collision_agent()
         if agent in self.actors and f.get("fled"):
             add(agent, "ACC_HIT_AND_RUN", "left the scene after the collision")
+        # Someone was hit and we know who did it, but no specific traffic offence
+        # explains the crash ("a guy on a scooter hit my mom"). Negligence causing
+        # hurt / death still has to be considered — whether it applies depends on
+        # the outcome, so the planner will ask "Was anyone hurt?".
+        if agent in self.actors and any(a.get("is_victim") for a in self.actors.values()):
+            aggravators = {r["from_code"] for r in self.kb.relations
+                           if r["type"] == "aggravates" and r["to_code"] in ("CRIM_HURT_RASH_NEGLIGENT", "ACC_CAUSING_DEATH")}
+            agent_codes = {c for e in events if e["actor"] == agent for c in e["offences"]}
+            if not (agent_codes & aggravators):
+                for code in ("CRIM_HURT_RASH_NEGLIGENT", "ACC_CAUSING_DEATH"):
+                    if (agent, code) in have or not self.kb.exists(code):
+                        continue
+                    a = self.actors.get(agent)
+                    events.append({"id": f"T{len(events) + 1}", "actor": agent,
+                                   "vehicle": a.get("vehicle") if a else None, "offences": [code],
+                                   "text": "hit someone (negligence is for the court to decide)",
+                                   "derived": True, "may": True})
+                    have.add((agent, code))
         speeders = [e["actor"] for e in events if any(c.startswith("SPEED_") for c in e["offences"])]
         if (f.get("speed_over_pct") or 0) >= 50:
             for s in speeders or [x["id"] for x in self.actors.values() if x.get("relation") == "self"]:
@@ -375,6 +393,8 @@ class Reasoner:
                     certainty = r.get("certainty") or "liable"
                     if certainty == "may_be_liable" and not explicit:
                         continue
+                    if e.get("may"):
+                        certainty = "may_be_liable"
                     if certainty == "may_be_liable" and target.get("relation") == "self" and r["role"] != "owner":
                         pass
                     self.findings.append(self._finding(

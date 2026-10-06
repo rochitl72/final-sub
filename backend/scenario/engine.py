@@ -43,7 +43,9 @@ def _complex(result: dict, rules: dict, text: str) -> bool:
         return False
     people = [p for p in result["persons"] if p["findings"]]
     if not people:
-        return False          # nothing definite from the story itself → regular pipeline
+        # a crash where someone was hit: answer it here (and ask "Was anyone hurt?")
+        # rather than falling back to the generic accident checklist
+        return bool(rules["facts"].get("collision") and result.get("conditional"))
     n_find = sum(len(p["findings"]) for p in people) + len(result.get("conditional", []))
     others = [p for p in people if p["actor"].get("relation") != "self"]
     asks = set(rules.get("asks") or [])

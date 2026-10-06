@@ -107,7 +107,8 @@ _OBJECT_COLLISION = re.compile(r"\b(hit|crashed into|rammed|bumped|dashed)\s+(a 
 _PERSON_WORDS = re.compile(r"\b(pedestrian|cyclist|rider|man|woman|boy|girl|child|kid|person|someone|people|him|her|them|me|us)\b", re.I)
 
 # Clauses that only describe the collision / victim, not an offence.
-_VICTIM_CLAUSE = re.compile(r"\b(hit|rammed|rear[- ]?ended|knocked|crashed into|ran into|bumped)\s+(me|us|my)\b|"
+_VICTIM_CLAUSE = re.compile(r"\b(hit|rammed|rear[- ]?ended|knocked|crashed into|ran into|bumped)\s+"
+                            r"(me|us|my\s+(?:car|bike|scooter|scooty|vehicle|auto|cycle|bicycle|motorbike))\b|"
                             r"\b(i|we) (was|were|got) (hit|knocked|rammed)\b", re.I)
 
 # Descriptions of lawful behaviour that share words with offences.
@@ -189,8 +190,20 @@ def _find_actor_mentions(cl: str) -> List[Tuple[int, str, dict]]:
         out.append((m.start(), "my child", {"relation": "child", "age": int(m.group(1)), "label": "Your child"}))
     for m in re.finditer(r"\b(?:the\s+)?(?:company|firm|transport company|travels)\s+owner\b|\bmy\s+(?:boss|employer|company)\b", cl, re.I):
         out.append((m.start(), "employer", {"relation": "employer", "roles": ["owner", "employer"], "label": "The company / owner"}))
+    # "my neighbour's 15 year old son" / "my friend's daughter" → the CHILD is the
+    # person in the story (not "your son"), and the possessor is not a separate actor.
+    chained = []
+    for m in re.finditer(rf"\bmy\s+{_KIN}'?s\s+(?:(\d{{1,2}})[- ]?(?:year|yr)s?[- ]?old\s+)?{_KIN}\b", cl, re.I):
+        owner_kin, age, kin = m.group(1).lower(), m.group(2), m.group(3).lower()
+        attrs = {"relation": "other", "label": f"Your {owner_kin}'s {kin}"}
+        if age:
+            attrs["age"] = int(age)
+        out.append((m.start(), f"{owner_kin}'s {kin}", attrs))
+        chained.append((m.start(), m.end()))
     for m in re.finditer(rf"\bmy\s+(?:younger|elder|older|little|big|eldest|youngest|own)?\s*{_KIN}\b", cl, re.I):
         kin = m.group(1).lower()
+        if any(a <= m.start() < b for a, b in chained):
+            continue
         if any(k == f"my {kin}" for _, k, _ in out):
             continue
         out.append((m.start(), f"my {kin}", {"relation": kin, "label": f"Your {kin}"}))
@@ -198,8 +211,11 @@ def _find_actor_mentions(cl: str) -> List[Tuple[int, str, dict]]:
     if m0 and not re.match(r"\s*(driver|friend)\b", cl, re.I):
         kin = m0.group(1).lower()
         out.append((0, f"my {kin}", {"relation": kin, "label": f"Your {kin}"}))
+    chain_owner = next((k.split("'s ")[0] for _, k, _ in out if "'s " in k), None)
     for m in re.finditer(r"\b(?:his|her|their)\s+(father|dad|mother|mom|parents?|guardian)\b", cl, re.I):
-        out.append((m.start(), f"parent {m.group(1).lower()}", {"relation": "parent", "roles": [], "label": f"The {m.group(1).lower()}"}))
+        who = m.group(1).lower()
+        label = f"The {who}" + (f" (your {chain_owner})" if chain_owner and who in ("father", "dad", "mother", "mom") else "")
+        out.append((m.start(), f"parent {who}", {"relation": "parent", "roles": [], "label": label}))
     for m in re.finditer(r"\b(?:a|the)\s+(minor|teenager|kid|boy|girl)\b(?=\s+(?:was|is|had|drove|rode|driving|riding))", cl, re.I):
         out.append((m.start(), f"minor {m.group(1).lower()}", {"relation": "other", "roles": ["driver"], "age": 17,
                                                               "label": f"The {m.group(1).lower()}"}))
@@ -231,8 +247,18 @@ def _find_actor_mentions(cl: str) -> List[Tuple[int, str, dict]]:
     for m in re.finditer(r"\b(?:his|her|their|my)\s+friend\s+(?:on the back|behind|riding pillion|on the pillion)\b|"
                          r"\bfriend (?:on the back|behind (?:him|her|me))\b", cl, re.I):
         out.append((m.start(), "pillion friend", {"relation": "friend", "roles": ["pillion"], "label": "The pillion rider"}))
+    for rx in (r"\b(?:a|an|some|the|this|that)\s+(?:young\s+|drunk\s+)?(?:guy|man|boy|lady|woman|girl|person|youngster|"
+               r"chap|fellow|dude|stranger)\s+(?:on|riding|in|driving)\s+(?:a|an|the|his|her)?\s*" + _VEH + r"\b",
+               r"\bsomeone\s+(?:on|riding|in|driving)\s+(?:a|an|the)?\s*" + _VEH + r"\b"):
+        for m in re.finditer(rx, cl, re.I):
+            veh = m.group(m.lastindex).lower()
+            role = "rider" if _vehicle_segment(veh) == "two_wheeler" else "driver"
+            out.append((m.start(), f"{veh} {role}", {"relation": "other", "roles": [role],
+                                                      "label": f"The {veh} {role}", "_veh": veh}))
     for m in re.finditer(r"\b(?:a|another|some|the other)\s+" + _VEH + r"\b(?=\s+(?:hit|rammed|rear[- ]?ended|knocked|crashed|bumped|ran))", cl, re.I):
         veh = m.group(1).lower()
+        if any(k.startswith(f"{veh} ") and p_ < m.start() for p_, k, _ in out):
+            continue          # "a guy on a scooter hit …" — already the scooter rider
         out.append((m.start(), f"other {veh}", {"relation": "other", "roles": ["driver"],
                                                  "label": f"The other {veh} driver", "_veh": veh}))
     out.sort(key=lambda x: x[0])
@@ -336,6 +362,9 @@ def extract(text: str) -> dict:
             before = cl[max(0, pos - 18):pos].lower()
             possessive = pos > 3 and bool(re.match(r"(my|his|her)\s+\w+'s", cl[pos:pos + 30].lower()))
             is_object = possessive or bool(re.search(r"\b(hit|rammed|knocked|into|over|with|to|let|gave|helped|saw|and|behind|pillion was|was)\s*$", before))
+            # "hit my mom" / "knocked down an old man" → that person is the victim
+            if a["relation"] != "self" and re.search(r"\b(hit|rammed|knocked(?: down)?|ran over|run over|ran into|crashed into|bumped(?: into)?)\s*$", before):
+                a["is_victim"] = True
             if pos <= 12 and clause_subject is None and not is_object:
                 clause_subject = a["id"]
         head = cl[:14].lower()
@@ -505,6 +534,9 @@ def extract(text: str) -> dict:
                   if not any(c.startswith(pref) and not rx.search(cl) for pref, rx in _CUES)]
         for code in _example_hits(cl):
             ranked = [(code, 20)] + [(c, s) for c, s in ranked if c != code]
+        # same evidence rules as the LLM path: "15 year old son … car" is not an old diesel car
+        from scenario.extract_llm import _story_supports
+        ranked = [(c, s) for c, s in ranked if _story_supports(c, full)]
         if not ranked:
             continue
         top = ranked[0][1]
@@ -615,7 +647,8 @@ def extract(text: str) -> dict:
             if v.get("owner") == self_a["id"]:
                 v["owner"] = emp["id"]
     # "his father owns the car"
-    om = re.search(rf"\b(?:his|her|their)\s+(father|dad|mother|mom|parents?)\s+owns?\s+the\s+{_VEH}\b", full, re.I)
+    om = re.search(rf"\b(?:his|her|their)\s+(father|dad|mother|mom|parents?)\s+owns?\s+the\s+{_VEH}\b", full, re.I) or \
+        re.search(rf"\b(?:his|her|their)\s+(father|dad|mother|mom|parents?)'?s\s+{_VEH}\b", full, re.I)
     if om:
         par = next((a for a in b.actors if a["relation"] == "parent"), None)
         seg = _vehicle_segment(om.group(2))
