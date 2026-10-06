@@ -75,7 +75,7 @@ def _person_header(p: dict, actors: Dict[str, dict], vehicles: Dict[str, dict]) 
     return f"**{label}**" + (f" ({', '.join(bits)})" if bits else "")
 
 
-def _finding_line(f: dict) -> str:
+def _finding_line(f: dict, repeat: bool = False) -> str:
     sec = _sec(f)
     name = f["name"]
     amount = _rupees(f.get("fine_first"))
@@ -83,7 +83,10 @@ def _finding_line(f: dict) -> str:
     parts = [f"**{name}**" + (f" ({sec})" if sec else "")]
     money = f"**{amount}**{each} first offence" if f.get("fine_first") else "fine set by the court"
     if f.get("fine_repeat") and f.get("fine_repeat") != f.get("fine_first"):
-        money += f", {_rupees(f['fine_repeat'])} repeat"
+        if repeat:
+            money = f"**{_rupees(f['fine_repeat'])}**{each} repeat offence (first offence: {amount})"
+        else:
+            money += f", {_rupees(f['fine_repeat'])} repeat"
     parts.append(money)
     if f.get("imprisonment"):
         parts.append(f"jail: {f['imprisonment']}")
@@ -126,7 +129,7 @@ def compose(result: dict, *, city_name: Optional[str], question: Optional[dict],
         juvenile = [f for f in p["findings"] if f.get("juvenile")]
         normal = [f for f in p["findings"] if not f.get("juvenile")]
         for f in normal:
-            lines.append(_finding_line(f))
+            lines.append(_finding_line(f, repeat=bool(facts.get("repeat"))))
         if juvenile:
             names = ", ".join(f["name"].lower() for f in juvenile)
             lines.append(f"• Offences committed: {names}. Because the driver is a juvenile, s.199A charges the "
@@ -139,7 +142,11 @@ def compose(result: dict, *, city_name: Optional[str], question: Optional[dict],
             lines.append(f"• Licence / vehicle: {la}.")
         liable = [f for f in normal if f["certainty"] == "liable"]
         if len(liable) >= 2 or any(f.get("count", 1) > 1 for f in liable):
-            lines.append(f"• Total if first offences: **{_rupees(p['total_first'])}**")
+            if facts.get("repeat"):
+                tot = sum((f.get("fine_repeat") or f.get("fine_first") or 0) * f.get("count", 1) for f in liable)
+                lines.append(f"• Total as repeat offences: **{_rupees(tot)}**")
+            else:
+                lines.append(f"• Total if first offences: **{_rupees(p['total_first'])}**")
         payload_people.append(_person_payload(p, "offender"))
 
     for p in victims:
@@ -187,7 +194,8 @@ def compose(result: dict, *, city_name: Optional[str], question: Optional[dict],
         else:
             lines.append("**Are you liable?** Not on these facts — no offence is charged to you.")
 
-    assumptions = ["first offence for everyone"] + result.get("assumptions", [])
+    assumptions = (["repeat offence — the higher repeat fines apply"] if facts.get("repeat")
+                   else ["first offence for everyone"]) + result.get("assumptions", [])
     if city_name:
         assumptions.append(f"fines from the {city_name} schedule where it has one, else state / central")
     lines.append("")

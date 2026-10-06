@@ -795,6 +795,32 @@ class DialogManager:
                     "session_state":  _summary(s),
                 }
 
+            # Anything ticked → full person-by-person answer from the Scenario
+            # Engine (guardian liability, licence offence, repeat fines).
+            try:
+                from scenario.engine import driver_context_turn
+                sc = driver_context_turn(
+                    s,
+                    repeat=bool(s.get("repeat_offender")),
+                    minor=isinstance(s.get("driver_age"), int) and s["driver_age"] < 18,
+                    no_licence=s.get("has_licence") is False,
+                )
+            except Exception:
+                sc = None
+            if sc is not None:
+                sc["session_state"] = _summary(s)
+                return sc
+
+            if not (s.get("repeat_offender") or s.get("has_licence") is False
+                    or (isinstance(s.get("driver_age"), int) and s["driver_age"] < 18)):
+                # Nothing ticked → the answer above already stands; don't repeat the card.
+                card = s.get("last_fine_card") or {}
+                amt = f"₹{int(card['fine_first']):,}" if card.get("fine_first") else "the fine above"
+                reply = f"Got it — nothing extra applies, so {amt} (first offence) is what you'd pay."
+                s.setdefault("messages", []).append({"role": "assistant", "content": reply})
+                return {"intent": "narrate", "reply": reply, "fine_card": None, "chips": None,
+                        "session_state": _summary(s)}
+
             out = self._dynamic_answer_for_violation(s, with_followup=False)
 
             extras: List[str] = []

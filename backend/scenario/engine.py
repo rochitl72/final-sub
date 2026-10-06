@@ -230,3 +230,40 @@ def maybe_handle(session: dict, text: str) -> Optional[dict]:
     except Exception:
         log.exception("scenario render failed")
         return None
+
+
+def driver_context_turn(session: dict, *, repeat: bool, minor: bool, no_licence: bool) -> Optional[dict]:
+    """The legacy single-offence flow asks a checkbox question (repeat / no
+    licence / under 18). When any box is ticked, re-run the whole story through
+    the Scenario Engine so the answer becomes a proper person-by-person
+    breakdown (e.g. under 18 → the guardian is charged under s.199A) instead of
+    a hedged one-liner bolted onto the old card."""
+    story = (session.get("last_user_story") or "").strip()
+    if not story or not (repeat or minor or no_licence):
+        return None
+    extra = []
+    if minor:
+        extra.append("I am 16 years old.")
+    if no_licence and not minor:
+        extra.append("I don't have a valid driving licence.")
+    text = story.rstrip(". ") + ". " + " ".join(extra) if extra else story
+    rules = extract_rules.extract(text)
+    if repeat:
+        rules.setdefault("facts", {})["repeat"] = True
+    session["scenario_asked"] = []
+    lead_bits = []
+    if minor:
+        lead_bits.append("under 18")
+    if no_licence and not minor:
+        lead_bits.append("no valid licence")
+    if repeat:
+        lead_bits.append("repeat offence")
+    lead = "Updated with what you ticked (" + ", ".join(lead_bits) + ")."
+    try:
+        out = _render(session, text, rules, lead=lead, intent="scenario_update")
+    except Exception:
+        log.exception("driver-context scenario render failed")
+        return None
+    if out is not None:
+        session["last_user_story"] = story          # keep the user's own words
+    return out

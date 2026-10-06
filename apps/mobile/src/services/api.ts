@@ -20,7 +20,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // @ts-ignore
 const _envUrl = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL;
 // Web (the PWA) is served by the backend itself → same-origin requests.
-export const BASE_URL: string = _envUrl || (Platform.OS === 'web' ? '' : 'http://127.0.0.1:8000');
+// The env URL (a LAN IP written for phone builds) must NOT be used on web: the
+// page is already served by the backend, and a stale IP silently broke every
+// request (New chat, translation, …).
+export const BASE_URL: string = Platform.OS === 'web' ? '' : (_envUrl || 'http://127.0.0.1:8000');
 
 const CACHE_TTL_MS = 7 * 24 * 3600 * 1000;   // catalogs cached 7 days
 // F5 fix: bump CACHE_VERSION whenever catalog SHAPE changes (new vehicle
