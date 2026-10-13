@@ -93,6 +93,35 @@ export default function ChatScreen() {
     ]).start(() => setToastMsg(''));
   }, [toastAnim]);
 
+  // ── Background refinement (self-hosted LLM): poll until the refined answer arrives
+  const [refining, setRefining] = useState(false);
+  const pollIdRef = useRef(0);
+  useEffect(() => () => { pollIdRef.current++; }, []);
+  const pollUpdates = useCallback(async () => {
+    if (!sessionId) return;
+    const myId = ++pollIdRef.current;
+    setRefining(true);
+    const started = Date.now();
+    try {
+      while (Date.now() - started < 120_000) {
+        await new Promise((r) => setTimeout(r, 2500));
+        if (pollIdRef.current !== myId) return;          // a newer turn took over
+        let r;
+        try { r = await dialogApi.updates(sessionId); } catch { continue; }
+        if (pollIdRef.current !== myId) return;
+        for (const u of r.updates || []) useChatStore.getState().applyTurnResponse(u);
+        if (!r.refining) break;
+      }
+    } finally {
+      if (pollIdRef.current === myId) setRefining(false);
+    }
+  }, [sessionId]);
+  const afterTurn = useCallback((resp: TurnResponse) => {
+    pollIdRef.current++;                                  // stop any older poll
+    setRefining(false);
+    if ((resp as any)?.refining) pollUpdates();
+  }, [pollUpdates]);
+
   const hydrateAiMode = useAiModeStore((s) => s.hydrate);
   const toggleAiPreference = useAiModeStore((s) => s.togglePreference);
 
@@ -270,6 +299,7 @@ export default function ChatScreen() {
       }
       removePendingMessage(pendingId);
       applyTurnResponse(resp);
+      afterTurn(resp);
     } catch {
       removePendingMessage(pendingId);
       // Even if the greeting call fails, greet locally so the screen isn't blank.
@@ -315,6 +345,7 @@ export default function ChatScreen() {
       }
       removePendingMessage(pendingId);
       applyTurnResponse(resp);
+      afterTurn(resp);
     } catch (err: any) {
       removePendingMessage(pendingId);
       addMessage({
@@ -356,6 +387,7 @@ export default function ChatScreen() {
       const resp = await dialogApi.turnMulti(sessionId, ids, otherText);
       removePendingMessage(pendingId);
       applyTurnResponse(resp);
+      afterTurn(resp);
     } catch {
       removePendingMessage(pendingId);
       addMessage({
@@ -384,6 +416,7 @@ export default function ChatScreen() {
       const resolved = (resp.mode || resp.session_state?.mode || newMode) as 'static' | 'dynamic';
       setCurrentMode(resolved);
       applyTurnResponse(resp);
+      afterTurn(resp);
     } catch {
       removePendingMessage(pendingId);
       // Roll back optimistic toggle on failure.
@@ -404,6 +437,7 @@ export default function ChatScreen() {
       const resp = await dialogApi.manualLocation(sessionId, { state_code: stateCode, city_code: cityCode, text });
       removePendingMessage(pendingId);
       applyTurnResponse(resp);
+      afterTurn(resp);
     } catch {
       removePendingMessage(pendingId);
     } finally {
@@ -421,6 +455,7 @@ export default function ChatScreen() {
       const resp = await dialogApi.pinDrop(sessionId, lat, lng);
       removePendingMessage(pendingId);
       applyTurnResponse(resp);
+      afterTurn(resp);
     } catch {
       removePendingMessage(pendingId);
     } finally {
@@ -442,6 +477,7 @@ export default function ChatScreen() {
       const resp = await dialogApi.revertLocation(sessionId);
       removePendingMessage(pendingId);
       applyTurnResponse(resp);
+      afterTurn(resp);
       scrollToBottom();
     } catch {
       removePendingMessage(pendingId);
@@ -636,6 +672,13 @@ export default function ChatScreen() {
                 </LinearGradient>
               )}
             </TouchableOpacity>
+          </View>
+        )}
+
+        {refining && (
+          <View style={styles.locFooterRow}>
+            <ActivityIndicator size="small" color={Colors.gray} />
+            <Text style={styles.revertText}>Checking the details with the AI — the answer may update</Text>
           </View>
         )}
 

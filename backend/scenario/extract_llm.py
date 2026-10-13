@@ -9,6 +9,7 @@ dropped. It never states amounts or sections; the reasoner does.
 from __future__ import annotations
 
 import json
+import os
 import logging
 import re
 from typing import List, Optional
@@ -75,12 +76,49 @@ def _catalogue() -> str:
     return "\n".join(get_kb().catalogue_lines())
 
 
+# Codes small self-hosted models should always see (the everyday offences).
+_CORE_CODES = ("SAFETY_NO_HELMET_RIDER", "SAFETY_NO_HELMET_PILLION", "SAFETY_NO_SEATBELT_DRIVER",
+               "SAFETY_NO_SEATBELT_PASSENGER", "SAFETY_MORE_THAN_2_ON_2W", "DOC_NO_DL", "DOC_NO_INSURANCE",
+               "DOC_NO_RC", "DOC_NO_PUC", "IMPAIRED_DRUNK", "DIST_MOBILE_USE", "SIGNAL_RED_LIGHT_JUMPING",
+               "SPEED_OVER_LMV", "SPEED_OVER_MMV_HMV", "SPEED_EXCESSIVE_50PLUS", "DIR_WRONG_WAY",
+               "ACC_HIT_AND_RUN", "OVERLOAD_PASSENGER", "OVERLOAD_GOODS_WEIGHT", "DOC_UNDERAGE")
+
+
+def _compact_catalogue(text: str) -> str:
+    """A story-specific catalogue: retrieval candidates + what the rules reader
+    found + the everyday offences. ~4x shorter than the full catalogue, which
+    matters on a CPU/small-GPU server (prompt reading dominates latency) and
+    gives a small model fewer wrong codes to pick from."""
+    kb = get_kb()
+    codes = list(dict.fromkeys(list(kb.candidates(text, 30)) + list(_CORE_CODES)))
+    try:
+        from scenario import extract_rules
+        for e in extract_rules.extract(text).get("events", []):
+            codes += [c for c in e.get("offences") or [] if c not in codes]
+    except Exception:
+        pass
+    wanted = set(c for c in codes if kb.exists(c))
+    lines = [ln for ln in kb.catalogue_lines() if ln.split("=", 1)[0].split(":", 1)[0].strip() in wanted]
+    return "\n".join(lines) if len(lines) >= 10 else _catalogue()
+
+
+def _compact_mode() -> bool:
+    m = os.environ.get("LLM_COMPACT_PROMPT", "").strip().lower()
+    if m in ("1", "true", "yes"):
+        return True
+    if m in ("0", "false", "no"):
+        return False
+    import llm_provider
+    return llm_provider.provider() == "ollama"
+
+
 def extract(text: str, call=None) -> Optional[dict]:
     """Scenario dict from the LLM, or None on any failure (caller falls back to rules)."""
     import llm_chatbot
     call = call or llm_chatbot._call_groq
     hints = "\n".join(get_kb().hint_lines(text))
-    messages = [{"role": "system", "content": _SYSTEM + _catalogue()},
+    catalogue = _compact_catalogue(text) if _compact_mode() else _catalogue()
+    messages = [{"role": "system", "content": _SYSTEM + catalogue},
                 {"role": "user", "content": f"STORY:\n{text.strip()[:1500]}\n\nMOST LIKELY CODES for this story (full wording — "
                                             f"check EACH against what the story says and include every one whose conduct is described, "
                                             f"on the right person):\n{hints}\n\nReturn the JSON object only."}]
@@ -88,7 +126,11 @@ def extract(text: str, call=None) -> Optional[dict]:
     # gpt-oss-120b first; on a rate limit fall back to gpt-oss-20b (separate
     # free-tier token budget) before giving up to the rules extractor.
     import time
-    for attempt, reasoning in enumerate((True, False, True)):
+    import llm_provider
+    # Groq free tier: 120b → 20b → wait → 120b on rate limits. A self-hosted
+    # server has no token quota, so one attempt (the breaker handles outages).
+    plan = (True,) if llm_provider.provider() == "ollama" else (True, False, True)
+    for attempt, reasoning in enumerate(plan):
         if attempt == 2:
             time.sleep(7)             # free tier is tokens-per-minute: a short wait usually clears it
         try:
@@ -123,6 +165,12 @@ _NEEDS = [
     ("FASTAG", r"fastag|fast tag|toll"), ("TOLL", r"toll|fastag"),
     ("MOD_BULL_BARS", r"bull|crash.?guard"), ("MOD_LASER", r"jammer|radar|laser"),
     ("SPEED_GOVERNOR", r"governor"), ("COMM_METER_TAMPERING", r"meter"),
+    # "stopped and called 108" is not phone use while driving
+    ("DIST_MOBILE_USE", r"phone|mobile|cell|texting|whatsapp|on a call|on call|talking on|scrolling|selfie|"
+                        r"\bcall(?:ing)?\b(?!\s*(?:108|112|100|the police|police|an? ambulance|ambulance))"),
+    ("COMM_NO_PERMIT", r"permit"),
+    ("DANGER_CARRYING_HAZARDOUS", r"hazard|chemical|gas|cylinder|explosive|acid|flammable|inflammable|fuel|petrol|diesel|lpg|cng"),
+    ("SAFETY_NO_SEATBELT", r"seat ?belt|belt"),
 ]
 
 
@@ -134,9 +182,42 @@ def _story_supports(code: str, text: str) -> bool:
     return True
 
 
+def _guard_mode() -> str:
+    """strict: an LLM offence must also be supported by retrieval or the rules
+    reader. Default strict for self-hosted models (quality varies by model),
+    loose for Groq gpt-oss (measured precision ~0.89 without it)."""
+    m = os.environ.get("LLM_EVIDENCE_GUARD", "").strip().lower()
+    if m in ("strict", "loose"):
+        return m
+    import llm_provider
+    return "strict" if llm_provider.provider() == "ollama" else "loose"
+
+
+def _supported_codes(text: str, evidences: List[str]) -> set:
+    """Codes the story itself points to, independent of the LLM."""
+    kb = get_kb()
+    sup = set(kb.candidates(text, 25))
+    for ev in evidences:
+        sup.update(kb.candidates(ev, 15))
+    try:
+        from scenario import extract_rules
+        r = extract_rules.extract(text)
+        for e in r.get("events", []):
+            sup.update(e.get("offences") or [])
+    except Exception:
+        pass
+    return sup
+
+
+_SCHEMA_ECHO = re.compile(r"short name|e\.g\.|'you', 'your son'", re.I)
+
+
 def validate(data: dict, text: str) -> Optional[dict]:
     kb = get_kb()
     story_n = _norm(text)
+    strict = _guard_mode() == "strict"
+    support = _supported_codes(text, [str(e.get("evidence", "")) for e in (data.get("events") or [])
+                                      if isinstance(e, dict)]) if strict else set()
     actors, vehicles, events = [], [], []
     ids = set()
     for a in data.get("actors") or []:
@@ -173,6 +254,8 @@ def validate(data: dict, text: str) -> Optional[dict]:
                 rel = "other"
         roles = [r for r in (a.get("roles") or []) if r in ("driver", "rider", "pillion", "passenger", "owner", "guardian",
                                                              "conductor", "operator", "employer", "pedestrian")]
+        if _SCHEMA_ECHO.search(a.get("label") or ""):
+            a["label"] = "Someone"            # weak models copy the schema example into the label
         actors.append({"id": str(a["id"]), "label": (a.get("label") or "Someone")[:40], "relation": rel,
                        "roles": roles, "age": age, "licence": lic, "is_victim": bool(a.get("is_victim")),
                        "vehicle": a.get("vehicle"), "count": max(1, int(a.get("count") or 1)), "ref": a.get("evidence", "")[:60]})
@@ -202,6 +285,8 @@ def validate(data: dict, text: str) -> Optional[dict]:
         if not _quoted(e.get("evidence", ""), story_n):
             continue
         codes = [c for c in (e.get("offences") or []) if isinstance(c, str) and kb.exists(c) and _story_supports(c, text)]
+        if strict:
+            codes = [c for c in codes if c in support]
         if not codes:
             continue
         events.append({"id": str(e.get("id") or f"E{len(events) + 1}"), "actor": e["actor"],

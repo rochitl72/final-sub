@@ -26,6 +26,12 @@ echo "▶ Scenario engine tests + gold-set gates (offline rules engine)…"
 python3 backend/tests/test_scenario_engine.py
 python3 scripts/eval_scenarios.py --engines rules --split dev --strict --out "${TMPDIR:-/tmp}/drivelegal_scn" | tail -9
 
+echo "▶ LLM provider switch (offline unit tests)…"
+python3 backend/tests/test_llm_provider.py
+
+echo "▶ Multi-turn conversation suite (rules, core checks must pass)…"
+env -u OLLAMA_URL -u LLM_PROVIDER python3 scripts/conversation_suite.py --strict 2>&1 | grep -E "FAIL|^core" | tail -12
+
 echo "▶ SQLite persistence selftest…"
 python3 backend/persistence.py selftest
 

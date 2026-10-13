@@ -91,6 +91,46 @@ def test_crash_damage_is_not_an_offence():
     assert not any("TAIL" in c or "LIGHT" in c for v in rows.values() for c, _ in v), rows
 
 
+def test_background_refinement_replaces_answer():
+    import time
+    import scenario.engine as eng
+    from scenario import extract_llm
+    os.environ["LLM_ASYNC_EXTRACT"] = "1"
+    orig = extract_llm.extract
+
+    def fake_llm(text, call=None):               # the "model" also spots the lapsed insurance
+        out = eng.extract_rules.extract(text)
+        drv = next((a for a in out["actors"] if a["relation"] in ("brother", "cousin")), None)
+        if drv is None:
+            return out
+        out["events"].append({"id": "L1", "actor": drv["id"], "vehicle": drv.get("vehicle"),
+                              "offences": ["DOC_NO_INSURANCE"], "text": "the insurance had lapsed"})
+        out["source"] = "llm"
+        return out
+    extract_llm.extract = fake_llm
+    try:
+        s = {"state_code": "TN", "city_code": "CHN", "city_name": "Chennai", "_turn_seq": 1}
+        first = maybe_handle(s, "my brother drove my car without a licence and jumped a red light, and the insurance had lapsed")
+        assert first is not None and first.get("refining"), first
+        for _ in range(50):
+            ups = eng.take_updates(s)
+            if ups:
+                break
+            time.sleep(0.1)
+        assert ups and ups[0]["replace_last"], ups
+        codes = {f["code"] for p in ups[0]["scenario"]["people"] for f in p["offences"]}
+        assert "DOC_NO_INSURANCE" in codes, codes
+        # a newer turn must win: a stale refinement is discarded
+        s["_turn_seq"] = 5
+        maybe_handle(s, "my cousin drove my bike without a helmet and jumped a red light")
+        s["_turn_seq"] = 6
+        time.sleep(0.5)
+        assert not eng.take_updates(s)
+    finally:
+        extract_llm.extract = orig
+        os.environ.pop("LLM_ASYNC_EXTRACT", None)
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in list(globals().items()):

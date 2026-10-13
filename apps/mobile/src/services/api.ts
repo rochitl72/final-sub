@@ -199,6 +199,8 @@ export interface TurnResponse {
   scenario?:      any;
   /** This answer supersedes the previous one (replace it in the chat). */
   replace_last?:  boolean;
+  /** The server is still refining this answer with the LLM; poll /updates. */
+  refining?:      boolean;
   reply?:         string;
   question?:      string;
   slot?:          string;
@@ -252,6 +254,12 @@ export const dialogApi = {
     if (message) body.message = message;
     if (chipId)  body.chip_id = chipId;
     const { data } = await api.post(`/api/session/${sessionId}/turn`, body);
+    return data;
+  },
+
+  /** Refined answers produced in the background (self-hosted LLM mode). */
+  updates: async (sessionId: string): Promise<{ updates: TurnResponse[]; refining: boolean }> => {
+    const { data } = await api.get(`/api/session/${sessionId}/updates`);
     return data;
   },
 

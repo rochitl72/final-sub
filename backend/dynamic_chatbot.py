@@ -2381,6 +2381,9 @@ def extract_and_reply(
                 reply = " ".join(kept).strip() or (
                     "Could you tell me a bit more about what happened — what were you "
                     "doing, and what did the officer say? I'll find the exact rule.")
+            if reply and not parsed.get("violation_code") and len(reply) > 160:
+                from llm_chatbot import AI_NOTE
+                reply += AI_NOTE                 # open answer with no rule behind it
         parsed["clean_reply"] = reply
 
     # ── Proactive inquiry policy (legacy text append — superseded by MCQ) ───

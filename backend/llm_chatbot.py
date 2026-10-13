@@ -59,8 +59,9 @@ def _groq_key() -> str:
     return os.environ.get("GROQ_CHAT_API_KEY", "")
 
 
-class GroqOfflineError(Exception):
-    """Raised when Groq is unreachable so the caller can fall back to offline_engine."""
+# One error type for every provider: "the LLM can't answer, use the rules engine".
+from llm_provider import LLMOfflineError as GroqOfflineError   # noqa: E402  (kept name for existing callers)
+import llm_provider                                            # noqa: E402
 
 
 def _available_models(key: str) -> Optional[List[str]]:
@@ -99,6 +100,8 @@ def _resolve_model(key: str, *, refresh: bool = False) -> str:
 
 def groq_model_name() -> Optional[str]:
     """Model currently in use (None until resolved)."""
+    if llm_provider.provider() == "ollama":
+        return llm_provider.ollama_model()
     return _active_model
 
 
@@ -238,6 +241,15 @@ def _call_groq(
     If the provider rejects that parameter we transparently retry WITHOUT it, so
     the online path can never regress because of JSON mode.
     """
+    if llm_provider.provider() == "ollama":
+        want_json = _json_mode_enabled() if json_mode is None else json_mode
+        # Story extraction asks for JSON with the "reasoning" model; everything
+        # else (leads, translation, open questions) uses the chat model.
+        purpose = "extract" if (want_json and reasoning) else "chat"
+        timeout = 25.0 if max_tokens <= 120 else None
+        return llm_provider.ollama_chat(messages, max_tokens=max_tokens, temperature=temperature,
+                                        json_mode=bool(want_json), purpose=purpose, timeout=timeout)
+
     key = _groq_key()
     if not key:
         raise GroqOfflineError("GROQ_CHAT_API_KEY not set — add it to .env in the repo root")
@@ -414,7 +426,16 @@ def handle_freeform(session: dict, user_text: str) -> Dict[str, Optional[object]
     reply = _ground_freeform(reply, [c for c in (fine_card, session.get("last_fine_card")) if c])
     if not reply:
         return _offline_freeform(session, user_text)
+    if not fine_card:
+        reply += AI_NOTE
     return {"reply": reply, "fine_card": fine_card}
+
+
+# Shown under answers the model wrote without a matching rule from the law
+# database (open questions). Fines/sections are stripped from those answers,
+# but the model can still be wrong about procedure — say so plainly.
+AI_NOTE = ("\n\n_General guidance written by AI, not from the law database — "
+           "confirm with the traffic police or a lawyer before acting on it._")
 
 
 def _ground_freeform(reply: str, cards: List[dict]) -> str:
@@ -457,6 +478,9 @@ def call_groq_narrate(
         + history
         + [{"role": "user", "content": user_text}]
     )
+    if llm_provider.provider() == "ollama":
+        # The org model is the LLM of record — don't route chat through Sarvam.
+        return _call_groq(messages, max_tokens=max_tokens, temperature=temperature, reasoning=reasoning)
     try:
         result = _call_sarvam(messages, max_tokens=max_tokens, temperature=temperature)
         log.debug("call_groq_narrate: Sarvam-M OK")
@@ -470,7 +494,9 @@ def call_groq_narrate(
 # ── Public: warmup (no-op for Groq) ──────────────────────────────────────────
 
 def warmup() -> bool:
-    """Resolve the Groq model at startup (token-free). True if Groq is usable."""
+    """Resolve the model at startup. True if the configured LLM is usable."""
+    if llm_provider.provider() == "ollama":
+        return llm_provider.ollama_warmup()
     key = _groq_key()
     if not key:
         log.info("Groq not configured (GROQ_CHAT_API_KEY not set) — offline engine will be used.")
@@ -485,6 +511,8 @@ def warmup() -> bool:
 def check_groq_status() -> bool:
     """Connectivity + key check for /api/health. Uses the free /models
     endpoint, so the 60 s background poll never spends tokens."""
+    if llm_provider.provider() == "ollama":
+        return llm_provider.ollama_ok()
     key = _groq_key()
     if not key:
         return False
@@ -501,6 +529,27 @@ _LANG_NAMES = {
     "gu-IN": "Gujarati", "pa-IN": "Punjabi", "od-IN": "Odia", "en-IN": "English",
 }
 _translate_cache: Dict[tuple, str] = {}
+
+
+# Unicode blocks per target language — a translation must be mostly in that script.
+_SCRIPT = {"hi-IN": "\u0900-\u097F", "mr-IN": "\u0900-\u097F", "ta-IN": "\u0B80-\u0BFF",
+           "te-IN": "\u0C00-\u0C7F", "kn-IN": "\u0C80-\u0CFF", "ml-IN": "\u0D00-\u0D7F",
+           "bn-IN": "\u0980-\u09FF", "gu-IN": "\u0A80-\u0AFF", "pa-IN": "\u0A00-\u0A7F",
+           "od-IN": "\u0B00-\u0B7F"}
+
+
+def _check_translation(src: str, out: str, lang: str) -> None:
+    """Reject a translation that isn't in the target script or that lost / changed
+    any amount or number — wrong money in a legal answer is worse than English."""
+    rng = _SCRIPT.get(lang)
+    if rng:
+        letters = re.findall(r"[^\W\d_]", out)
+        native = re.findall(f"[{rng}]", out)
+        if not letters or len(native) / len(letters) < 0.35:
+            raise GroqOfflineError(f"translation not in {lang} script")
+    nums = lambda t: sorted(re.findall(r"\d[\d,]*", t.replace("₹", "")))
+    if nums(src) != nums(out):
+        raise GroqOfflineError("translation changed the numbers")
 
 
 def groq_translate(text: str, target_language: str, source_language: str = "en-IN") -> str:
@@ -523,6 +572,7 @@ def groq_translate(text: str, target_language: str, source_language: str = "en-I
         {"role": "user", "content": text[:4000]},
     ]
     out = _call_groq(messages, max_tokens=1500, temperature=0.1, json_mode=False)
+    _check_translation(text, out, target_language)
     if len(_translate_cache) > 2000:
         _translate_cache.clear()
     _translate_cache[key] = out

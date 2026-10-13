@@ -298,6 +298,8 @@ def _remember_cards(s: dict, payload: dict) -> None:
 def _envelope(s: dict, payload: dict) -> dict:
     _remember_cards(s, payload)
     out = dict(payload)
+    if s.get("_refining"):
+        out["refining"] = True          # the app polls /updates for the refined answer
     out.setdefault("session_state", session_state(s))
     out["session_id"] = s["session_id"]
     return out
@@ -406,7 +408,9 @@ async def health():
     return {
         "app":            "drivelegal",
         "status":         "ok",
-        "groq_ok":        groq_ok,
+        "groq_ok":        groq_ok,       # = "the configured LLM is usable" (name kept for the app)
+        "llm_ok":         groq_ok,
+        "llm_provider":   __import__("llm_provider").provider(),
         "sarvam_ok":      sarvam_ok,
         "model":          groq_model_name() if groq_ok else "offline rules engine",
         "ready":          True,          # offline engine always available
@@ -596,6 +600,18 @@ async def session_turn(session_id: str, body: TurnBody):
         s.pop("_force_rules", None)
     _persist_turn_out(session_id, out, s)
     return _envelope(s, out)
+
+
+@app.get("/api/session/{session_id}/updates")
+async def session_updates(session_id: str):
+    """Refined answers produced in the background since the last turn
+    (self-hosted LLM mode). Each one replaces the answer on screen."""
+    s = _get_session_or_404(session_id)
+    from scenario.engine import take_updates
+    ups = take_updates(s)
+    for u in ups:
+        _persist_turn_out(session_id, u, s)
+    return {"updates": [_envelope(s, u) for u in ups], "refining": bool(s.get("_refining"))}
 
 
 @app.post("/api/session/{session_id}/revert_location")

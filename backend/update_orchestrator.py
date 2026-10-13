@@ -109,7 +109,22 @@ def _call_groq(
     state_code:  Optional[str],
     source_label: str,
 ) -> List[dict]:
-    """Send extracted page text to Groq. Returns list of structured patch dicts."""
+    """Send extracted page text to the LLM. Returns list of structured patch dicts."""
+    import llm_provider
+    if llm_provider.provider() == "ollama":
+        scope = f"State: {state_code}" if state_code else "Central / MV Act (all-India)"
+        try:
+            content = llm_provider.ollama_chat(
+                [{"role": "system", "content": _SYSTEM},
+                 {"role": "user", "content": f"Source: {source_label}\nScope: {scope}\n\n--- GOV WEBSITE TEXT ---\n"
+                                             f"{text[:6000]}\n--- END ---\n\nExtract fine changes as a JSON array:"}],
+                max_tokens=600, temperature=0.05, purpose="extract", timeout=120.0)
+            m = re.search(r"\[.*?\]", content, re.DOTALL)
+            items = json.loads(m.group(0)) if m else []
+            return items if isinstance(items, list) else []
+        except Exception as exc:
+            log.warning("LLM extraction failed for %s: %s", source_label, exc)
+            return []
     key = _groq_key()
     if not key:
         log.warning("GROQ_API_KEY not set — skipping Groq extraction (add to .env)")

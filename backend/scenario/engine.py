@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
 import re
 from typing import Optional
 
@@ -222,6 +223,21 @@ def maybe_handle(session: dict, text: str) -> Optional[dict]:
         return None
     complex_ = _complex(rules_result, rules, text)
     scn = rules
+    if use_llm and (complex_ or _llm_worth_it(rules, text)) and _async_mode():
+        # Slow self-hosted model: answer from rules now, let the LLM refine the
+        # same answer in the background (the app polls /updates).
+        _start_refinement(session, text, rules, complex_)
+        if not complex_:
+            return None                      # the regular pipeline answers now
+        session["scenario_asked"] = []
+        try:
+            out = _render(session, text, scn)
+        except Exception:
+            log.exception("scenario render failed")
+            return None
+        if out is not None:
+            out["refining"] = True
+        return out
     if use_llm and (complex_ or _llm_worth_it(rules, text)):
         from . import extract_llm
         llm = extract_llm.extract(text)
@@ -291,3 +307,63 @@ def chip_answer_turn(session: dict, chip_ids: list) -> Optional[dict]:
     # If several were ticked, the most serious option wins (chips are ordered
     # least → most serious).
     return maybe_handle(session, labels[-1])
+
+
+# ── Background refinement (slow self-hosted LLMs) ───────────────────────────
+import threading as _threading
+
+_refine_lock = _threading.Lock()
+
+
+def _async_mode() -> bool:
+    """Rules answer first, LLM refines in the background. Default on for
+    Ollama (seconds-to-a-minute per story on modest hardware), off for Groq."""
+    m = os.environ.get("LLM_ASYNC_EXTRACT", "").strip().lower()
+    if m in ("1", "true", "yes"):
+        return True
+    if m in ("0", "false", "no"):
+        return False
+    import llm_provider
+    return llm_provider.provider() == "ollama"
+
+
+def _start_refinement(session: dict, text: str, rules: dict, rules_answered: bool) -> None:
+    seq = session.get("_turn_seq", 0)
+    session["_refining"] = True
+
+    def job():
+        upd = None
+        try:
+            from . import extract_llm
+            llm = extract_llm.extract(text)
+            if llm:
+                scn2 = extract_llm.merge(llm, rules)
+                state, city, _ = _ctx(session)
+                res2 = analyse(scn2, state_code=state, city_code=city)
+                with _refine_lock:
+                    if session.get("_turn_seq", 0) != seq:
+                        return                      # the user moved on — never overwrite a newer answer
+                    if rules_answered:
+                        if signature(res2) != session.get("scenario_sig"):
+                            upd = _render(session, text, scn2, intent="scenario_update",
+                                          previous=session.get("scenario_sig"),
+                                          lead="Checked in more detail.")
+                    elif _complex(res2, scn2, text):
+                        session["scenario_asked"] = []
+                        upd = _render(session, text, scn2, lead="Checked in more detail.")
+                    if upd is not None:
+                        upd["replace_last"] = True
+                        session.setdefault("_updates", []).append(upd)
+        except Exception:
+            log.exception("background refinement failed")
+        finally:
+            if session.get("_turn_seq", 0) == seq:
+                session["_refining"] = False
+
+    _threading.Thread(target=job, name="scenario-refine", daemon=True).start()
+
+
+def take_updates(session: dict) -> list:
+    with _refine_lock:
+        ups = session.pop("_updates", None) or []
+    return ups

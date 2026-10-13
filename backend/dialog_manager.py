@@ -363,6 +363,11 @@ class DialogManager:
         other_text: Optional[str] = None,
     ) -> dict:
         """One conversational turn from POST /api/session/{id}/turn."""
+        # Every turn bumps the sequence so a slow background refinement never
+        # overwrites an answer the user has already moved past.
+        s["_turn_seq"] = s.get("_turn_seq", 0) + 1
+        s["_refining"] = False
+        s.pop("_updates", None)
         # Multi-select clarification submission (checkboxes) takes priority.
         if chip_ids is not None:
             return self._apply_multiselect(s, chip_ids, other_text=other_text)
