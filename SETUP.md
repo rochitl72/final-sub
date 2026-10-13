@@ -1,328 +1,110 @@
-# DriveLegal — Setup guide
+# DriveLegal — Setup
 
-Step-by-step instructions for **new contributors** cloning this repo and testing the app on **Windows, macOS, or Linux**, using a phone with **Expo Go** (iOS or Android).
+DriveLegal is one **Progressive Web App** (`apps/pwa`, React + Vite + Tailwind) served by a
+**FastAPI backend** (`backend/`). There is nothing to install on the phone: open the site and
+"Add to Home Screen".
 
-> **Demo scope:** This repository is configured for **easy demo testing** via **Expo Go** + a **free-tier Groq** API key + optional **Sarvam** keys. It is not a production App Store / Play Store build.
+## 1. Prerequisites
 
----
+| Tool | Why |
+|------|-----|
+| **Python 3.11+** | backend |
+| **Node.js 18+** and npm | builds the PWA (once, ~30 s) |
+| A browser | Chrome / Edge / Safari — on the laptop and/or a phone on the same Wi-Fi |
 
-## What you need
-
-| Item | Purpose |
-|------|---------|
-| **Python 3.11+** | FastAPI backend |
-| **Node.js 18+** | Expo / Metro bundler |
-| **Expo Go** on your phone | [iOS App Store](https://apps.apple.com/app/expo-go/id982107779) · [Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent) |
-| **Same Wi‑Fi** | Phone must reach your computer’s backend (`:8000`) |
-| **Optional API keys** | Groq (free tier), Sarvam (TTS + translate) — see [API keys](#4-api-keys-optional-but-recommended) |
-
----
-
-## Repository layout (after reorganisation)
+## 2. Repository layout
 
 ```
 final-sub/
-├── README.md                 # Project overview
-├── SETUP.md                  # This file
-├── start.sh                  # One command: backend + Expo (macOS/Linux)
-├── .env                      # Your secrets (create from config/.env.example)
-├── apps/
-│   ├── mobile/               # Expo React Native app (primary demo client)
-│   └── web/                  # Browser PWA (optional)
-├── backend/                  # FastAPI server + engine
-├── data/
-│   └── compiled/
-│       └── drivelegal_graph.json   # Knowledge graph (~1.2 MB)
-├── config/
-│   └── .env.example
-├── docs/
-└── scripts/
-    ├── verify.sh             # Run tests without starting servers
+├── run.sh                 # one command: deps → build PWA if needed → start the server
+├── .env.example           # copy to .env (git-ignored) and fill in
+├── backend/               # FastAPI app (api.py), graph engine, Scenario Engine, LLM + Sarvam services
+├── apps/pwa/              # the DriveLegal PWA (React + Vite + Tailwind) → dist/ served at "/"
+├── data/                  # knowledge graph + SQLite
+├── scripts/               # offline bundle builders, eval suites, verify.sh
+└── docs/                  # architecture, PWA, org LLM, scenario engine, eval notes
 ```
 
----
+## 3. Configure keys
 
-## 1. Clone and enter the project
+```bash
+cp .env.example .env
+```
+
+Edit `.env` (it is git-ignored — keys never go in the repo or in chat):
+
+| Variable | What it does |
+|----------|--------------|
+| `LLM_PROVIDER=ollama`, `OLLAMA_URL`, `OLLAMA_MODEL` | AI Chat uses the org's self-hosted LLM (org network only). See [docs/ORG_LLM.md](docs/ORG_LLM.md). |
+| `GROQ_CHAT_API_KEY` | Optional fallback LLM provider. |
+| `SARVAM_API_KEY` | Translation (11 Indian languages) + text-to-speech. |
+| `SESSION_SECRET` | JWT signing secret — set a long random string for any shared deployment. |
+
+With no keys at all the app still works: both modes fall back to the rule engine, and
+translation / Sarvam voice are disabled (the browser's own voice is used for read-aloud).
+
+## 4. Run it
 
 **macOS / Linux**
 
 ```bash
-cd ~/Downloads
-git clone https://github.com/rochitl72/final-sub.git
-cd final-sub
+bash run.sh
 ```
 
-**Windows (PowerShell)**
+**Windows** — use Git Bash for `bash run.sh`, or run the steps by hand in PowerShell:
 
 ```powershell
-cd $env:USERPROFILE\Downloads
-git clone https://github.com/rochitl72/final-sub.git
-cd final-sub
-```
-
----
-
-## 2. Install prerequisites
-
-### macOS
-
-```bash
-# Xcode Command Line Tools (if needed)
-xcode-select --install
-
-# Homebrew optional
-brew install python node
-
-python3 --version
-node --version
-```
-
-### Linux (Debian/Ubuntu)
-
-```bash
-sudo apt update
-sudo apt install -y python3 python3-pip nodejs npm curl
-
-python3 --version
-node --version
-```
-
-### Windows
-
-1. Install [Python 3.11+](https://www.python.org/downloads/) — check **“Add to PATH”**.
-2. Install [Node.js LTS](https://nodejs.org/).
-3. Use **Git Bash** or **PowerShell** for commands below.
-
-```powershell
-python --version
-node --version
-```
-
----
-
-## 3. Python dependencies (backend)
-
-**macOS / Linux**
-
-```bash
-cd final-sub
-python3 -m pip install -r backend/requirements.txt
-```
-
-**Windows**
-
-```powershell
-cd final-sub
 python -m pip install -r backend\requirements.txt
+cd apps\pwa; npm install; npm run build; cd ..\..
+cd backend; python -m uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
-Verify the graph file exists:
+Then open **http://localhost:8000**.
+
+## 5. Use it on a phone
+
+1. Phone and laptop on the same Wi-Fi.
+2. Find the laptop's LAN IP (`ipconfig getifaddr en0` on macOS, `ipconfig` on Windows).
+3. Open `http://<LAN-IP>:8000` on the phone.
+4. Browser menu → **Add to Home Screen** / **Install app**.
+
+> Browsers only allow GPS and full offline install on `https://` or `localhost`. Over plain
+> `http://<LAN-IP>` the app works, but use **Map** or **Browse** to set the location, and the
+> service worker won't install. For a phone demo, serve it over HTTPS — see [docs/PWA.md](docs/PWA.md).
+
+## 6. Developing the UI
 
 ```bash
-ls -la data/compiled/drivelegal_graph.json
+# terminal 1 — backend
+bash run.sh
+# terminal 2 — hot-reloading PWA dev server (proxies /api and /auth to :8000)
+cd apps/pwa && npm run dev          # → http://localhost:5173
 ```
 
----
+`npm run build` type-checks and writes `apps/pwa/dist/`; `run.sh` rebuilds automatically
+whenever the PWA source is newer than the build.
 
-## 4. API keys (optional but recommended)
-
-Copy the template and edit:
-
-**macOS / Linux**
+After changing the knowledge graph or the NLU FAQ, regenerate the on-device engine data:
 
 ```bash
-cp config/.env.example .env
-nano .env
+python3 scripts/build_offline_bundle.py
+python3 scripts/sync_offline_nlu.py
 ```
 
-**Windows**
-
-```powershell
-copy config\.env.example .env
-notepad .env
-```
-
-| Variable | Used for | Demo note |
-|----------|----------|-----------|
-| `GROQ_CHAT_API_KEY` | Cloud AI narrate (gpt-oss-20b by default; override with `GROQ_CHAT_MODEL`) | **Free tier** — used in this demo |
-| `SARVAM_API_KEY` | Hindi/Tamil TTS + translation | Strongly recommended for voice |
-| `GROQ_API_KEY` | Gov.in patch scraper only | Optional |
-
-Without keys: **rules-only mode** still works (graph + `offline_engine`).
-
----
-
-## 5. Start everything (recommended — macOS / Linux)
-
-From the repo root (`final-sub/`):
+## 7. Checks
 
 ```bash
-bash start.sh
+bash run.sh test          # pytest + scripted conversation eval
+bash scripts/verify.sh    # full gate, including the PWA type check + build
 ```
 
-This script:
+## 8. Troubleshooting
 
-1. Detects your LAN IP and writes `apps/mobile/.env`
-2. Loads `.env` API keys
-3. Installs npm packages in `apps/mobile/`
-4. Starts FastAPI on **port 8000**
-5. Starts **Expo Metro** and prints a **QR code**
-
-When Metro is ready it prints a QR code in the terminal:
-
-- **Metro URL:** `exp://<YOUR_LAN_IP>:8081`
-- **Backend URL:** `http://<YOUR_LAN_IP>:8000`
-
----
-
-## 6. Manual start (all platforms, including Windows)
-
-Use **two terminals**.
-
-### Terminal A — Backend
-
-**macOS / Linux**
-
-```bash
-cd final-sub
-set -a && source .env && set +a   # skip if no .env yet
-cd backend
-uvicorn api:app --host 0.0.0.0 --port 8000 --reload
-```
-
-**Windows PowerShell**
-
-```powershell
-cd final-sub\backend
-$env:PYTHONPATH = "."
-# Load .env manually or set keys:
-# $env:GROQ_CHAT_API_KEY = "gsk_..."
-uvicorn api:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Check health:
-
-```bash
-curl http://127.0.0.1:8000/api/health
-```
-
-### Terminal B — Expo (mobile)
-
-1. Find your computer’s LAN IP:
-   - **macOS:** `ipconfig getifaddr en0`
-   - **Linux:** `hostname -I | awk '{print $1}'`
-   - **Windows:** `ipconfig` → IPv4 Address
-
-2. Create `apps/mobile/.env`:
-
-```bash
-# Replace with YOUR IP
-echo EXPO_PUBLIC_API_BASE_URL=http://192.168.1.42:8000 > apps/mobile/.env
-```
-
-**macOS / Linux**
-
-```bash
-cd final-sub/apps/mobile
-npm ci --legacy-peer-deps
-npx expo install --fix
-npx expo start --lan
-```
-
-**Windows**
-
-```powershell
-cd final-sub\apps\mobile
-npm ci --legacy-peer-deps
-npx expo install --fix
-npx expo start --lan
-```
-
----
-
-## 7. Open the app on your phone (Expo Go only)
-
-> **Testing is intended for Expo Go** — no native build or store signing required.
-
-### iOS
-
-1. Install **Expo Go** from the App Store.
-2. Connect iPhone to the **same Wi‑Fi** as your computer.
-3. Scan the **QR code** in the terminal (Camera app or Expo Go).
-4. Allow local network access if prompted.
-
-### Android
-
-1. Install **Expo Go** from Google Play.
-2. Same Wi‑Fi as your computer.
-3. Scan the QR code **inside Expo Go** (or use Metro’s `a` for emulator).
-
-### Android emulator only
-
-The emulator cannot use your Mac’s LAN IP. Use:
-
-```bash
-echo EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8000 > apps/mobile/.env
-```
-
-Then restart Expo.
-
----
-
-## 8. Quick test checklist
-
-| Step | Expected |
-|------|----------|
-| Open app | Home screen, no login |
-| New chat → Calculator | Chips + fine card |
-| New chat → Chatbot | Location → describe violation |
-| Status pill | “Cloud AI” or “Rules (auto)” / “Rules only” |
-| Language → Hindi | Translated reply text |
-| Speaker icon | Voice in selected language (needs `SARVAM_API_KEY`) |
-| Web browser | `http://<IP>:8000` serves PWA from `apps/web/` |
-
----
-
-## 9. Run automated checks (no phone)
-
-```bash
-cd final-sub
-bash scripts/verify.sh
-```
-
----
-
-## 10. Troubleshooting
-
-| Problem | Fix |
+| Symptom | Fix |
 |---------|-----|
-| Phone can’t connect | Same Wi‑Fi; disable VPN; check firewall allows **8000** and **8081** |
-| `Groq AI: offline` in terminal | Normal without key or quota — rules engine still works |
-| TTS fails | Add `SARVAM_API_KEY`, restart `start.sh`, reload app (`r` in Metro) |
-| `TTS API error 400` | Restart backend after pulling latest (Bulbul v3 speaker fix) |
-| Watchman warnings (macOS) | Optional: `watchman watch-del '/Users/you' ; watchman watch-project '/Users/you'` |
-| Windows + phone | Use LAN IP in `.env`, not `127.0.0.1` |
-
-Backend logs: `/tmp/drivelegal_api.log` when using `start.sh`.
-
----
-
-## 11. 3D knowledge graph (no server)
-
-One-click in your browser (public repo):
-
-**https://htmlpreview.github.io/?https://raw.githubusercontent.com/rochitl72/final-sub/main/docs/visualizations/drivelegal_graph_3d.html**
-
-Or open `docs/visualizations/drivelegal_graph_3d.html` locally.
-
-## 12. Optional: web PWA
-
-With backend running: `http://127.0.0.1:8000/` (serves `apps/web/`).
-
----
-
-## Next steps
-
-- Architecture & offline/online flows: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- Backend module map: [backend/README.md](backend/README.md)
-- Mobile app notes: [apps/mobile/README.md](apps/mobile/README.md)
+| Page shows `{"status": "DriveLegal API running"}` | The PWA isn't built — `cd apps/pwa && npm install && npm run build`, or check `/tmp/drivelegal-pwa-build.log`. |
+| `npm install` skips Vite / Tailwind | Your shell has `NODE_ENV=production`; run `NODE_ENV=development npm install --include=dev`. |
+| Engine pill says **Rules (auto)** | The LLM isn't reachable (off the org network?). Answers still come from the rule engine. |
+| Engine pill says **Offline** | The device can't reach the server — answers come from the on-device engine. |
+| Old UI after an update | The service worker updates itself on the next load; reload once more. |
+| Translation / Sarvam voice missing | Add `SARVAM_API_KEY` to `.env` and restart. |

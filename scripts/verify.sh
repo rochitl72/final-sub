@@ -35,15 +35,12 @@ env -u OLLAMA_URL -u LLM_PROVIDER python3 scripts/conversation_suite.py --strict
 echo "▶ SQLite persistence selftest…"
 python3 backend/persistence.py selftest
 
-echo "▶ Service worker + offline bundle syntax…"
-node --check apps/web/sw.js
-node --check apps/web/offline.bundle.js
-
-if [ -d apps/mobile/node_modules ]; then
-  echo "▶ Mobile TypeScript check…"
-  (cd apps/mobile && npx tsc --noEmit -p .)
+if [ -d apps/pwa/node_modules ]; then
+  echo "▶ PWA type check + production build…"
+  (cd apps/pwa && npm run build >/tmp/drivelegal-pwa-verify.log 2>&1) || { tail -30 /tmp/drivelegal-pwa-verify.log; exit 1; }
+  test -f apps/pwa/dist/sw.js
 else
-  echo "▶ Mobile TypeScript check skipped (run npm ci in apps/mobile first)"
+  echo "▶ PWA build skipped (run: cd apps/pwa && npm install)"
 fi
 
 echo ""

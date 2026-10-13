@@ -171,7 +171,7 @@ def ground_amounts(text: str, allowed: set) -> str:
 
     Splits on sentence / clause boundaries (. ; —) and keeps clauses with no
     amounts or only allowed ones. Returns "" if nothing grounded remains.
-    Kept in sync with apps/mobile/src/offline/graph.ts (groundAmounts).
+    Kept in sync with apps/pwa/src/offline/graph.ts (groundAmounts).
     """
     if not text or not _RUPEE_RE.search(text):
         return text

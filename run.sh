@@ -20,19 +20,23 @@ if [ "$1" = "test" ]; then
   python3 scripts/eval_conversations.py --engines rules $([ -n "$GROQ_CHAT_API_KEY" ] && echo groq --pace 3)
   exit
 fi
-# The PWA = the mobile app's web build (same screens, desktop layout on wide windows). Built once; needs Node 18+.
-# Served at "/"; the original single-file page stays at /classic.  Rebuild after UI changes: (cd apps/mobile && npm run build:web)
-# Rebuild when there is no build yet, or when any app source is newer than it.
+# The DriveLegal PWA (apps/pwa — React + Vite + Tailwind), served by the backend at "/". Needs Node 18+.
+# Rebuilt automatically when there is no build yet or any source is newer than it.
+#   UI development with hot reload:  (cd apps/pwa && npm run dev)  → http://localhost:5173 (proxies /api to :8000)
 _pwa_stale=0
-if [ ! -f apps/mobile/dist/sw.js ]; then _pwa_stale=1
-elif [ -n "$(find apps/mobile/src apps/mobile/app apps/mobile/public-pwa apps/mobile/scripts apps/mobile/package.json \
-              -newer apps/mobile/dist/sw.js -type f 2>/dev/null | head -1)" ]; then _pwa_stale=1; fi
-if [ "$_pwa_stale" = 1 ] && command -v npm >/dev/null 2>&1; then
-  echo ">>> Building the DriveLegal PWA (~1-2 min)… log: /tmp/drivelegal-pwa-build.log"
-  if (cd apps/mobile && npm install --no-audit --no-fund && npm run build:web) >/tmp/drivelegal-pwa-build.log 2>&1; then
-    echo ">>> PWA built."
+if [ ! -f apps/pwa/dist/sw.js ]; then _pwa_stale=1
+elif [ -n "$(find apps/pwa/src apps/pwa/public apps/pwa/index.html apps/pwa/package.json apps/pwa/vite.config.ts \
+              apps/pwa/tailwind.config.js -newer apps/pwa/dist/sw.js -type f 2>/dev/null | head -1)" ]; then _pwa_stale=1; fi
+if [ "$_pwa_stale" = 1 ]; then
+  if command -v npm >/dev/null 2>&1; then
+    echo ">>> Building the DriveLegal PWA (~30 s)… log: /tmp/drivelegal-pwa-build.log"
+    if (cd apps/pwa && NODE_ENV=development npm install --include=dev --no-audit --no-fund && npm run build) >/tmp/drivelegal-pwa-build.log 2>&1; then
+      echo ">>> PWA built."
+    else
+      echo "!! PWA build failed — see /tmp/drivelegal-pwa-build.log"
+    fi
   else
-    echo "!! PWA build failed — see /tmp/drivelegal-pwa-build.log. Serving the classic page for now."
+    echo "!! npm not found — install Node 18+ to build the PWA (the API still runs)."
   fi
 fi
 pkill -f "uvicorn api:app" 2>/dev/null || true

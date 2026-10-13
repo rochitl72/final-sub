@@ -30,4 +30,4 @@ cd final-sub/backend
 uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Or from repo root: `bash start.sh` (backend + Expo).
+Or from repo root: `bash run.sh` (backend + the PWA at http://localhost:8000).

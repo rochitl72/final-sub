@@ -7,7 +7,7 @@ client-side offline engine (resolver + fine lookup + narration) to answer with
 ZERO network. Output is shipped inside the mobile app / precached by the PWA.
 
 Run:  python3 scripts/build_offline_bundle.py
-Out:  apps/mobile/src/offline/drivelegal_offline.json
+Out:  apps/pwa/src/offline/drivelegal_offline.json
 """
 
 import json
@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC  = ROOT / "data" / "compiled" / "drivelegal_graph.json"
-OUT  = ROOT / "apps" / "mobile" / "src" / "offline" / "drivelegal_offline.json"
+OUT  = ROOT / "apps" / "pwa" / "src" / "offline" / "drivelegal_offline.json"
 
 # Violation fields the offline engine actually uses (keeps the bundle small).
 VIO_FIELDS = [

@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: dark; }
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-ink text-mist font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  button { -webkit-user-select: none; user-select: none; }
+  ::selection { background: rgba(37, 99, 235, 0.45); color: #fff; }
+  :focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+}
+
+@layer components {
+  .bg-deep { background: linear-gradient(180deg, #000000 0%, #050d1f 55%, #0a1628 100%); }
+  .bg-gloss { background: linear-gradient(160deg, #3b82f6 0%, #2563eb 50%, #1a4fa8 100%); }
+  .bg-glow { background: linear-gradient(135deg, #1a4fa8, #2563eb); }
+  .bg-user-bubble { background: linear-gradient(135deg, #2f6df0, #2563eb 55%, #1d4ed8); }
+  .bg-fine { background: linear-gradient(170deg, #050d1f, #0a1628 55%, #0f2040); }
+  .glass { background: rgba(10, 22, 44, 0.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+
+  .icon-btn {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-navy-border bg-navy-mid text-mist-soft
+      transition hover:border-brand-light/60 hover:text-white active:scale-95 disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gloss px-5 py-3.5 font-semibold text-white shadow-glow
+      transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none;
+  }
+  .chip {
+    @apply rounded-full border border-navy-border bg-navy-mid px-2.5 py-0.5 text-xs font-semibold text-mist transition hover:border-brand-light hover:text-white;
+  }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: #1a3a6b transparent; }
+  .scroll-thin::-webkit-scrollbar { width: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: #1a3a6b; border-radius: 9999px; }
+  .safe-top { padding-top: max(env(safe-area-inset-top), 0.75rem); }
+  .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.75rem); }
+}
+
+/* Leaflet sits inside a dark UI */
+.leaflet-container { background: #0a1628; font-family: inherit; }
+.leaflet-control-attribution { background: rgba(5, 13, 31, 0.75) !important; color: #8899bb !important; }
+.leaflet-control-attribution a { color: #60a5fa !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

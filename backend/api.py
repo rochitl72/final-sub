@@ -151,11 +151,9 @@ app.add_middleware(
 # Mount auth routes
 app.include_router(auth_router)
 
-_LEGACY_WEB = _HERE.parent / "apps" / "web"
-_DESKTOP = _HERE.parent / "apps" / "mobile" / "dist"   # Expo web export of the mobile app (the PWA)
-# The mobile app's web export (apps/mobile: `npx expo export -p web`) is the main site when built; the original
-# single-file PWA stays available at /classic.
-_FRONTEND = _DESKTOP if (_DESKTOP / "index.html").exists() else _LEGACY_WEB
+# The DriveLegal PWA (apps/pwa: React + Vite + Tailwind). Build it with `cd apps/pwa && npm run build`;
+# run.sh does this automatically when the build is missing or older than the source.
+_FRONTEND = _HERE.parent / "apps" / "pwa" / "dist"
 _VIZ_HTML = _HERE.parent / "docs" / "visualizations" / "drivelegal_graph_3d.html"
 
 DEFAULT_STATE_CODE = os.getenv("DRIVELEGAL_DEFAULT_STATE", "KA")
@@ -384,7 +382,7 @@ def _persist_user_event(sid: str, event: str, payload: Optional[dict] = None) ->
 async def _pwa_cache_headers(request, call_next):
     """Service worker + shell must always be revalidated so a new deploy reaches installed PWAs."""
     resp = await call_next(request)
-    if request.url.path in ("/", "/index.html", "/sw.js", "/manifest.webmanifest") or request.url.path.startswith("/workbox-"):
+    if request.url.path in ("/", "/index.html", "/sw.js", "/registerSW.js", "/manifest.webmanifest") or request.url.path.startswith("/workbox-"):
         resp.headers["Cache-Control"] = "no-cache"
     return resp
 
@@ -746,8 +744,6 @@ async def knowledge_graph_viz():
 
 
 # ── Static frontend (mounted last so /api/* still wins) ──────────────────────
-if _FRONTEND is _DESKTOP and _LEGACY_WEB.exists():
-    app.mount("/classic", StaticFiles(directory=str(_LEGACY_WEB), html=True), name="classic")
 class _SPAStatic(StaticFiles):
     """Static files with a single-page-app fallback: unknown paths (e.g. /chat?sessionId=…) get index.html,
     so reloading a deep link in the PWA works."""
@@ -756,7 +752,7 @@ class _SPAStatic(StaticFiles):
             return await super().get_response(path, scope)
         except Exception as exc:          # starlette raises HTTPException(404) for missing files
             if getattr(exc, "status_code", None) == 404 and "." not in path.rsplit("/", 1)[-1] \
-                    and not path.lstrip("/").startswith(("api/", "auth/", "docs", "openapi", "viz", "classic")):
+                    and not path.lstrip("/").startswith(("api/", "auth/", "docs", "openapi", "viz")):
                 return await super().get_response("index.html", scope)
             raise
 

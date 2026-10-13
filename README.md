@@ -17,17 +17,16 @@ DriveLegal turns India's Motor Vehicles Act into a conversation. It's built arou
 GPS) so every answer is grounded in real law with the exact MV Act section and
 state/city-specific fine — never a hallucinated number.
 
-It runs across a **FastAPI backend**, an **Expo (React Native) mobile app**, and a
-**Progressive Web App** — and it works **online *and* fully offline**.
-
-> **Main version: the DriveLegal PWA** — the web build of the mobile app (`apps/mobile`, same UI, desktop layout on wide screens), installable and offline-capable, served by the backend at `/`. The same code runs natively in Expo Go. See [docs/PWA.md](docs/PWA.md).
+It is one **installable Progressive Web App** (React + Vite + Tailwind) served by a
+**FastAPI backend** — phone layout on phones, two-pane layout on desktop — and it works
+**online *and* offline**. See [docs/PWA.md](docs/PWA.md).
 
 ## The two modes
 
-| Mode | How it works | Needs internet? |
-|------|--------------|-----------------|
-| ☁️ **AI Chat** | Groq (gpt-oss-20b by default, auto-selected) narrates over the graph; best language quality | Yes |
-| 📋 **Calculator (rule-based)** | Chip-driven: deterministic resolver + graph fine-cascade — instant, exact, 100% grounded. Also the offline fallback for AI Chat | No |
+| Mode | How it works | Needs the server? |
+|------|--------------|-------------------|
+| ✨ **AI Chat** | Describe what happened in your own words. The rule engine answers instantly (person-by-person breakdown from the Scenario Engine); the org's self-hosted LLM (Ollama, llama3.1:8b) then refines that same answer in the background. Groq is the fallback provider. | For the LLM — falls back to the on-device rule engine |
+| 🧮 **Calculator** | Chip-driven: location → road → vehicle → violation. Deterministic resolver + graph fine cascade — instant, exact, 100% grounded | No (on-device engine) |
 
 **Across every mode, the fine amount always comes from the graph** — the language
 model only phrases the answer, so it can never misquote a penalty.
@@ -63,10 +62,10 @@ model only phrases the answer, so it can never misquote a penalty.
    │   FastAPI backend     │                         │  Client (ported to TS/JS) │
    │  graph engine         │                         │  resolver + fine cascade  │
    │  violation resolver   │                         │  narration engine         │
-   │  dynamic chatbot (LLM)│                         │  (mobile app + PWA)       │
+   │  dynamic chatbot (LLM)│                         │  (PWA, apps/pwa)          │
    │  gov scraper + patches│                         └──────────────────────────┘
    └──────────┬────────────┘                                      │
-              │ Groq / Sarvam                                     │
+              │ Ollama (org) / Groq / Sarvam                      │
               ▼                                                    ▼
         AI Chat mode                                     Rule-based offline fallback
 ```
@@ -76,9 +75,8 @@ looked up in the graph regardless of which mode answered.
 
 ## Tech stack
 
-- **Backend:** Python, FastAPI, SQLite, an in-memory graph engine, Groq + Sarvam APIs
-- **Mobile:** Expo / React Native, expo-router, Zustand, react-native-maps
-- **Web:** Vanilla JS PWA, service worker, Leaflet
+- **Backend:** Python, FastAPI, SQLite, an in-memory graph engine, Scenario Engine; Ollama (org LLM) / Groq + Sarvam
+- **App (PWA):** React 19, Vite 6, Tailwind CSS 3, Zustand, React Router, Leaflet, Workbox (vite-plugin-pwa)
 - **Data:** compiled JSON knowledge graph + additive patch store
 
 ## Repository structure
@@ -91,11 +89,10 @@ backend/                 FastAPI app, graph engine, resolver, chatbot, offline e
   dynamic_chatbot.py     LLM narrate flow (Cloud AI)
   offline_engine.py      rule-based fallback (no LLM)
   gov_scraper.py + patch_engine.py + update_orchestrator.py   law-update pipeline
-apps/mobile/             Expo / React Native app — native AND the PWA (npm run build:web → dist/, served at /)
-  src/offline/           TypeScript port of the resolver + graph (rule-based offline engine)
-apps/web/                original single-file PWA (kept at /classic)
-  offline.bundle.js      bundled offline engine
-  sw.js                  service worker (precaches app + engine)
+apps/pwa/                the DriveLegal PWA — React + Vite + Tailwind (npm run build → dist/, served at /)
+  src/screens/           HomeScreen (chat list / sidebar), ChatScreen (both modes)
+  src/components/        fine card, scenario cards, MCQ, location picker, language picker, …
+  src/offline/           TypeScript port of the resolver + graph (on-device rule engine)
 data/compiled/           drivelegal_graph.json — the knowledge graph
 scripts/                 build_offline_bundle.py, eval + verify helpers
 docs/                    architecture notes, scenario engine, eval guide
@@ -103,32 +100,26 @@ docs/                    architecture notes, scenario engine, eval guide
 
 ## Getting started
 
-### 1. Backend
+One command (needs Python 3.11+ and Node 18+):
 
 ```bash
-cd backend
-python3 -m pip install -r backend/requirements.txt
-cp ../.env.example ../.env      # then add your keys (see below)
-python3 api.py                 # serves on http://0.0.0.0:8000
+cp .env.example .env     # then add your keys (see below)
+bash run.sh              # installs deps, builds the PWA if needed, serves http://localhost:8000
 ```
 
-### 2. Mobile app (Expo Go)
+Open `http://localhost:8000` on the laptop, or `http://<your-LAN-IP>:8000` on a phone on the same
+Wi-Fi, and use the browser's **Install app / Add to Home Screen**.
+
+UI development with hot reload (backend still running on :8000):
 
 ```bash
-cd apps/mobile
-npm install
-# point the app at your machine's LAN IP so a physical phone can reach the backend
-EXPO_PUBLIC_API_BASE_URL="http://<YOUR_LAN_IP>:8000" npx expo start
+cd apps/pwa && npm install && npm run dev     # http://localhost:5173, /api proxied to :8000
 ```
-Scan the QR with **Expo Go**. Use the home-screen toggle: **Calculator · AI Chat**.
 
-### 3. PWA
-
-Serve `apps/web/` (the backend does this at `http://localhost:8000/`).
-
-Regenerate the offline datasets after changing the graph:
+Regenerate the on-device data after changing the graph:
 ```bash
-python3 scripts/build_offline_bundle.py   # → apps/mobile/src/offline/drivelegal_offline.json
+python3 scripts/build_offline_bundle.py   # → apps/pwa/src/offline/drivelegal_offline.json
+python3 scripts/sync_offline_nlu.py       # → apps/pwa/src/offline/faq.generated.ts
 ```
 
 ## Environment variables
@@ -137,7 +128,8 @@ Copy `.env.example` → `.env` (git-ignored) and set:
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `GROQ_CHAT_API_KEY` | Cloud AI chat (Groq free tier) | for Cloud mode |
+| `LLM_PROVIDER`, `OLLAMA_URL`, `OLLAMA_MODEL` | The org's self-hosted LLM for AI Chat (see [docs/ORG_LLM.md](docs/ORG_LLM.md)) | for AI Chat |
+| `GROQ_CHAT_API_KEY` | Fallback LLM provider (Groq free tier) | optional |
 | `SARVAM_API_KEY` | Text-to-speech + translation | for voice/translate |
 | `SESSION_SECRET` | JWT signing (set a random string) | for production |
 
@@ -147,9 +139,9 @@ Copy `.env.example` → `.env` (git-ignored) and set:
 ## How offline works
 
 The knowledge graph and resolver are pure functions, so they were ported to TypeScript
-and bundled for the client (`apps/mobile/src/offline/`, `apps/web/offline.bundle.js`).
-The service worker precaches the app shell and the offline engine. After one online visit the
-rule-based experience (Calculator and chat fallback) works with the network off; AI Chat needs the cloud.
+and bundled into the PWA (`apps/pwa/src/offline/`). The Workbox service worker precaches the
+app shell and the engine. After one online visit, when the server can't be reached the app
+answers on-device with the same fine cards; the LLM refinement needs the server.
 
 ## Tested conversation quality
 

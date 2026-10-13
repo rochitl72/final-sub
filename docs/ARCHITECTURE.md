@@ -30,7 +30,7 @@ Indexed by `graph_engine.py`:
 
 | Module | Responsibility |
 |--------|----------------|
-| `api.py` | REST routes, CORS, mounts `apps/web/` |
+| `api.py` | REST routes, CORS, serves the PWA (`apps/pwa/dist`) at `/` with SPA fallback |
 | `dialog_manager.py` | Session store, turns, MCQ, mode switch |
 | `dynamic_chatbot.py` | Narrate phase, protocol parse/strip |
 | `offline_engine.py` | Template narrate when cloud LLM unavailable |
@@ -115,14 +115,15 @@ TTS uses language-specific defaults; English may set speaker `shubh`. Indian lan
 
 ---
 
-## Mobile app (`apps/mobile/`)
+## PWA (`apps/pwa/`)
 
-- **expo-router** — `app/(app)/home`, `chat`
-- **Zustand** — `authStore`, `languageStore`, `aiModeStore`
-- **`useAiConnectivity`** — NetInfo + `/api/health` → pill + `sarvamAvailable` for TTS
-- **Device auth** — UUID in SecureStore → `POST /auth/device`
+- **React 19 + Vite 6 + Tailwind CSS 3**, React Router (`/`, `/chat?sessionId=…&mode=…`)
+- **Zustand** — `store/auth` (device auth), `store/chat` (sessions + messages), `store/prefs` (AI preference, language)
+- **`useConnectivity`** — `navigator.onLine` + `/api/health` → engine pill + `sarvamAvailable`; no server → on-device engine
+- **Device auth** — UUID in localStorage → `POST /auth/device` → JWT
+- **Workbox** service worker via `vite-plugin-pwa` (precached shell, cached catalogs / sessions / map tiles)
 
-Cross-platform: same JS on iOS and Android via Expo Go.
+One responsive app: phone layout below 1024 px, two-pane desktop layout above. See [PWA.md](PWA.md).
 
 ---
 
@@ -157,8 +158,8 @@ bash scripts/verify.sh
 ```
 
 Includes smoke tests, device auth, Sarvam TTS speaker regression, offline-robustness
-units, the **conversation eval** (rules engine, strict), persistence selftest, service
-worker / offline bundle syntax and the mobile TypeScript check.
+units, the **conversation eval** (rules engine, strict), persistence selftest, and the PWA
+type check + production build.
 
 ### Conversation eval
 
@@ -180,6 +181,6 @@ retries on rate limits so results aren't masked by the offline fallback.
 ### Keeping the on-device engine in sync
 
 - `scripts/augment_keywords.py` — everyday / Hinglish synonyms merged into the graph
-- `scripts/build_offline_bundle.py` — graph slice for the phone / PWA
-- `scripts/sync_offline_nlu.py` — FAQ + guardrail generated from `backend/nlu.py`
-- `npx esbuild apps/web/offline-entry.ts …` — PWA bundle (see `apps/web/offline-entry.ts`)
+- `scripts/build_offline_bundle.py` — graph slice for the PWA (`apps/pwa/src/offline/drivelegal_offline.json`)
+- `scripts/sync_offline_nlu.py` — FAQ + guardrail generated from `backend/nlu.py` (`apps/pwa/src/offline/faq.generated.ts`)
+- `cd apps/pwa && npm run build` — bundles them into the app

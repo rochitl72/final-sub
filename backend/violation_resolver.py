@@ -124,7 +124,7 @@ def correct_typos(text: str, kw_index: dict) -> str:
     Only tokens of 5+ letters that aren't already keywords are considered, the
     candidate must share the first letter, be a single edit away, and be the
     ONLY such candidate — so "helmt"→"helmet", "signel"→"signal", but "night"
-    never becomes "light". Kept in sync with apps/mobile/src/offline/resolver.ts.
+    never becomes "light". Kept in sync with apps/pwa/src/offline/resolver.ts.
     """
     vocab = _vocab(kw_index)
     out = []
@@ -143,7 +143,7 @@ def correct_typos(text: str, kw_index: dict) -> str:
 
 
 # (cue, preferred code, code it should beat). Kept in sync with
-# apps/mobile/src/offline/resolver.ts.
+# apps/pwa/src/offline/resolver.ts.
 # (topic required, cue, preferred code, code it should beat)
 _WHO_DISAMBIG = [
     (re.compile(r"\bhelmet", re.I),

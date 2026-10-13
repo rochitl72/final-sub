@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
-OUT = ROOT / "apps" / "mobile" / "src" / "offline" / "faq.generated.ts"
+OUT = ROOT / "apps" / "pwa" / "src" / "offline" / "faq.generated.ts"
 
 
 def main() -> None:
