@@ -1,0 +1,71 @@
+name: dataset gate
+
+# DriveLegal tells members of the public what the law says, so every figure it
+# states must be traceable — or clearly labelled when it is not. These checks exist
+# because each failure they catch has already happened once:
+#   * unsourced amounts were served as law (12.6% of claims contradicted the statute)
+#   * a derived field silently re-opened the provenance gate after it was closed
+#   * the offline bundle drifted from the online data with nothing to detect it
+#
+# See docs/DATASET_VALIDATION_REPORT.md.
+
+on:
+  push:
+    paths:
+      - 'data/**'
+      - 'backend/**'
+      - 'scripts/**'
+      - 'tools/dataset/**'
+      - 'apps/pwa/src/offline/**'
+      - '.github/workflows/dataset-gate.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── The audit artifacts (v5) are internally consistent ──────────────────
+      - name: Provenance gate (v5 audit artifacts)
+        run: python3 tools/dataset/ci_gate.py
+
+      - name: Answer regression (v5 vs pre-audit graph)
+        run: python3 tools/dataset/regression_check.py
+
+      - name: Online / offline parity (v5 SQLite vs JSON resolver)
+        run: python3 tools/dataset/bench_parity.py
+
+      # ── What the app serves carries the audit's labels ──────────────────────
+      - name: Exported graph and offline bundle are current
+        run: |
+          python3 scripts/export_graph.py
+          python3 scripts/build_offline_bundle.py
+          git diff --exit-code data/compiled/drivelegal_graph.json apps/pwa/src/offline/drivelegal_offline.json \
+            || { echo "::error::exported graph / offline bundle are stale — run scripts/export_graph.py and scripts/build_offline_bundle.py, then commit"; exit 1; }
+
+      - name: Live provenance gate (data/drivelegal.db + PWA offline bundle)
+        run: python3 tools/dataset/check_live_provenance.py
+
+      - name: Backend checks
+        run: |
+          pip install -q -r backend/requirements.txt
+          python3 backend/tests/test_scenario_engine.py
+          python3 scripts/eval_conversations.py --engines rules --strict --out /tmp/eval
+
+  pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/pwa/package-lock.json
+      - name: PWA type check + build
+        run: cd apps/pwa && npm ci && npm run build

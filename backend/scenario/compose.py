@@ -239,7 +239,9 @@ def _person_payload(p: dict, kind: str) -> dict:
                           "fine_repeat": f.get("fine_repeat"), "imprisonment": f.get("imprisonment"),
                           "compoundable": f.get("compoundable"), "certainty": f["certainty"],
                           "deemed": bool(f.get("deemed")), "juvenile": bool(f.get("juvenile")),
-                          "licence_action": f.get("licence_action"), "severity": f.get("severity")}
+                          "licence_action": f.get("licence_action"), "severity": f.get("severity"),
+                          "verify_status": f.get("verify_status"), "verify_note": f.get("verify_note"),
+                          "citation": f.get("citation")}
                          for f in p["findings"]]}
 
 

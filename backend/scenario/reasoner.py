@@ -521,6 +521,9 @@ class Reasoner:
                 f["imprisonment"] = card.get("imprisonment")
                 f["compoundable"] = card.get("compoundable")
                 f["fine_source"] = card.get("fine_source")
+                f["verify_status"] = card.get("verify_status")
+                f["verify_note"] = card.get("verify_note")
+                f["citation"] = card.get("citation")
             else:
                 f.update({"fine_first": None, "fine_repeat": None, "imprisonment": None,
                           "compoundable": vio.get("compoundable"), "fine_source": None})

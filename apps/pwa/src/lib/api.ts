@@ -71,6 +71,10 @@ export interface Session {
   last_snippet: string;
 }
 
+/** Dataset-audit result for an amount (scripts/apply_v5_provenance.py). */
+export type VerifyStatus = 'verified' | 'corrected' | 'unverified';
+export interface Citation { url: string; title?: string | null; retrieved?: string | null }
+
 export interface FineCard {
   state_code: string;
   city_code: string | null;
@@ -87,6 +91,9 @@ export interface FineCard {
   license_action: string | null;
   notes: string | null;
   mv_section?: string | null;
+  verify_status?: VerifyStatus | null;
+  verify_note?: string | null;
+  citation?: Citation | null;
 }
 
 export interface SessionState {
@@ -130,6 +137,9 @@ export interface ScenarioOffence {
   deemed?: boolean;
   juvenile?: boolean;
   severity?: string;
+  verify_status?: VerifyStatus | null;
+  verify_note?: string | null;
+  citation?: Citation | null;
 }
 export interface ScenarioPerson {
   id?: string;

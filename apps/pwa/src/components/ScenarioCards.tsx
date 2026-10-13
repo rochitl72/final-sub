@@ -1,6 +1,7 @@
 import { User } from 'lucide-react';
 import type { Scenario } from '../lib/api';
 import { cx, inr } from '../lib/format';
+import { ProvenanceTag } from './Provenance';
 
 function Tag({ tone, children }: { tone: 'warn' | 'info' | 'crim'; children: string }) {
   const c = tone === 'warn' ? 'border-amber-500/70 text-amber-400' : tone === 'info' ? 'border-brand-pale/70 text-brand-pale' : 'border-red-500/70 text-red-400';
@@ -44,6 +45,7 @@ export function ScenarioCards({ scenario }: { scenario: Scenario }) {
                       {o.certainty === 'may_be_liable' && <Tag tone="warn">may apply</Tag>}
                       {(o.deemed || o.juvenile) && <Tag tone="info">s.199A</Tag>}
                       {o.severity === 'criminal' && <Tag tone="crim">criminal</Tag>}
+                      <ProvenanceTag status={o.verify_status} note={o.verify_note} citation={o.citation} />
                     </div>
                     {sub && <div className="mt-1 text-[11.5px] text-mist-soft">{sub}</div>}
                   </div>

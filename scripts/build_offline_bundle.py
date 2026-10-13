@@ -26,6 +26,8 @@ VIO_FIELDS = [
 FINE_FIELDS = [
     "first_offence", "repeat_offence", "imprisonment",
     "vehicle_class", "state_code", "city_code", "note",
+    # provenance (scripts/apply_v5_provenance.py) — offline answers carry the same label
+    "verify_status", "verify_note", "citation",
 ]
 
 

@@ -31,6 +31,23 @@ It is one **installable Progressive Web App** (React + Vite + Tailwind) served b
 **Across every mode, the fine amount always comes from the graph** — the language
 model only phrases the answer, so it can never misquote a penalty.
 
+## Audited amounts, labelled on screen
+
+Every amount the app shows carries the result of a scripted audit against the Motor Vehicles
+Act text ([docs/DATASET_VALIDATION_REPORT.md](docs/DATASET_VALIDATION_REPORT.md)):
+
+| Label | Meaning | Count |
+|---|---|---:|
+| **verified** | matches the statute; links the source | 87 |
+| **corrected** | the old figure contradicted the Act and was replaced with the statutory amount (e.g. abandoned vehicle ₹50 → ₹500 under s.201; excess passengers ₹1,000 → ₹200 each under s.194A) | 4 |
+| **unverified** | no source could be retrieved — mostly state / city amounts, since state compounding notifications aren't published in a checkable form; shown, with a note to confirm on the e-challan portal | 615 |
+
+The 12 everyday §177A offences (no entry, U-turn, one-way, …) no longer claim a ₹1,500 repeat
+fine the Act doesn't provide. `scripts/apply_v5_provenance.py` writes the labels into
+`data/drivelegal.db`; `tools/dataset/` holds the audit pipeline, and CI
+(`.github/workflows/dataset-gate.yml`) fails if a served amount loses its label or drifts
+from the statute.
+
 ## Key features
 
 - **Grounded answers** — exact fine, MV Act section, compoundable status, tips, and

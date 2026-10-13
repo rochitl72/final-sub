@@ -770,6 +770,14 @@ class GraphEngine:
             "state_code":           fine.get("state_code"),
             "city_code":            fine.get("city_code"),
             "violation_group":      vio.get("grp")               if vio else None,
+            # ── Provenance (docs/DATASET_VALIDATION_REPORT.md, scripts/apply_v5_provenance.py)
+            # verified   → amount matched the statute; `citation` links the source
+            # corrected  → the statute contradicted the old amount; this is the statutory figure
+            # unverified → no source could be found; shown, but labelled
+            "verify_status":        fine.get("verify_status"),
+            "verify_note":          fine.get("verify_note"),
+            "citation":             fine.get("citation"),
+            "section_status":       vio.get("section_status")    if vio else None,
             # Patch fields — populated below if updates exist, None otherwise
             "patch_fine_first":     None,
             "patch_fine_repeat":    None,

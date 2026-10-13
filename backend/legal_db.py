@@ -79,7 +79,9 @@ CREATE TABLE IF NOT EXISTS violation (
   common_misconception  TEXT,
   severity              TEXT,         -- 'minor' | 'serious' | 'criminal'
   licence_action        TEXT,         -- structured: 'suspend_3m', 'disqualify', …
-  road_buckets          TEXT          -- JSON list; NULL = from edges
+  road_buckets          TEXT,         -- JSON list; NULL = from edges
+  section_status        TEXT,         -- audit verdict on mv_section: verified | unverified | off_topic | …
+  section_note          TEXT
 );
 
 CREATE TABLE IF NOT EXISTS violation_provision (
@@ -135,7 +137,9 @@ CREATE TABLE IF NOT EXISTS penalty (
   note              TEXT,
   licence_action    TEXT,
   community_service TEXT,
-  source_id         INTEGER REFERENCES source(id)
+  source_id         INTEGER REFERENCES source(id),
+  verify_status     TEXT,                -- verified | corrected | unverified (scripts/apply_v5_provenance.py)
+  verify_note       TEXT                 -- statutory wording / why it is unverified
 );
 CREATE INDEX IF NOT EXISTS penalty_by_vio ON penalty(violation_code);
 
@@ -260,8 +264,8 @@ def _export(conn: sqlite3.Connection) -> Dict[str, Any]:
             body[c] = v
         body["keywords"] = aliases.get(r["code"], [])
         # New structured fields only when set (keeps legacy shape byte-identical).
-        for c in ("severity", "licence_action"):
-            if r[c]:
+        for c in ("severity", "licence_action", "section_status", "section_note"):
+            if c in r.keys() and r[c]:
                 body[c] = r[c]
         vios[f"vio:{r['code']}"] = body
 
@@ -278,10 +282,21 @@ def _export(conn: sqlite3.Connection) -> Dict[str, Any]:
         vehs[f"veh:{r['code']}"] = body
 
     fines: Dict[str, dict] = {}
-    for r in conn.execute("SELECT * FROM penalty ORDER BY ord"):
+    for r in conn.execute("""SELECT p.*, s.url AS source_url, s.title AS source_title,
+                                    s.retrieved AS source_retrieved
+                             FROM penalty p LEFT JOIN source s ON s.id = p.source_id
+                             ORDER BY p.ord"""):
         body = {"type": "fine", "id": r["id"]}
         for c in _FINE_COLS:
             body[c] = r[c]
+        # Provenance (only when the audit has been applied — keeps older DBs byte-identical).
+        if "verify_status" in r.keys() and r["verify_status"]:
+            body["verify_status"] = r["verify_status"]
+            if r["verify_note"]:
+                body["verify_note"] = r["verify_note"]
+            if r["verify_status"] in ("verified", "corrected") and r["source_url"]:
+                body["citation"] = {"url": r["source_url"], "title": r["source_title"],
+                                    "retrieved": r["source_retrieved"]}
         fines[f"fine:{r['id']}"] = body
 
     pool = {**geo, **vios, **vehs, **fines}

@@ -34,6 +34,9 @@ export interface FineNode {
   state_code: string | null;
   city_code: string | null;
   note: string | null;
+  verify_status?: 'verified' | 'corrected' | 'unverified' | null;
+  verify_note?: string | null;
+  citation?: { url: string; title?: string | null; retrieved?: string | null } | null;
 }
 
 export interface FineCard {
@@ -51,6 +54,9 @@ export interface FineCard {
   state_code: string | null;
   city_code: string | null;
   violation_group: string | null;
+  verify_status?: 'verified' | 'corrected' | 'unverified' | null;
+  verify_note?: string | null;
+  citation?: { url: string; title?: string | null; retrieved?: string | null } | null;
 }
 
 type Bundle = {
@@ -201,5 +207,8 @@ export function quickFine(
     state_code: fine.state_code,
     city_code: fine.city_code,
     violation_group: vio ? vio.grp : null,
+    verify_status: fine.verify_status ?? null,
+    verify_note: fine.verify_note ?? null,
+    citation: fine.citation ?? null,
   };
 }

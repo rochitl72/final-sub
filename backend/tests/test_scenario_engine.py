@@ -98,7 +98,12 @@ def test_background_refinement_replaces_answer():
     os.environ["LLM_ASYNC_EXTRACT"] = "1"
     orig = extract_llm.extract
 
+    import threading
+    newer_turn = threading.Event()               # the stale job must not finish before turn 6 exists
+
     def fake_llm(text, call=None):               # the "model" also spots the lapsed insurance
+        if "cousin" in text:
+            newer_turn.wait(5)
         out = eng.extract_rules.extract(text)
         drv = next((a for a in out["actors"] if a["relation"] in ("brother", "cousin")), None)
         if drv is None:
@@ -124,6 +129,7 @@ def test_background_refinement_replaces_answer():
         s["_turn_seq"] = 5
         maybe_handle(s, "my cousin drove my bike without a helmet and jumped a red light")
         s["_turn_seq"] = 6
+        newer_turn.set()
         time.sleep(0.5)
         assert not eng.take_updates(s)
     finally:

@@ -1,0 +1,35 @@
+{
+ "mva_1988_consolidated": {
+  "key": "mva_1988_consolidated",
+  "url": "https://indiankanoon.org/doc/785258/",
+  "title": "The Motor Vehicles Act, 1988 (consolidated, as amended)",
+  "authority": "primary_statute",
+  "http": "200",
+  "retrieved_at": "2026-09-22T12:06:14+00:00",
+  "ok": true,
+  "chars": 418950,
+  "sha256": "382a38b73b0669c3996fc7b6914442ea0db44491f8d2b709d8558cc647afe3fb"
+ },
+ "cmvr_1989": {
+  "key": "cmvr_1989",
+  "url": "https://indiankanoon.org/doc/28072254/",
+  "title": "The Central Motor Vehicles Rules, 1989 (consolidated)",
+  "authority": "primary_statute",
+  "http": "200",
+  "retrieved_at": "2026-09-22T12:06:17+00:00",
+  "ok": true,
+  "chars": 1046034,
+  "sha256": "1d306b83330c26eb79f75d0f8cf088f67d7f3dcce0755ec3eb26dc5b86b16a97"
+ },
+ "mva_amendment_2019": {
+  "key": "mva_amendment_2019",
+  "url": "https://prsindia.org/files/bills_acts/bills_parliament/2019/Motor%20Vehicles%20(Amendment)%20Act,%202019.pdf",
+  "title": "The Motor Vehicles (Amendment) Act, 2019 (Act 32 of 2019), Gazette of India",
+  "authority": "gazette",
+  "http": "200",
+  "retrieved_at": "2026-09-22T12:06:21+00:00",
+  "ok": true,
+  "chars": 196787,
+  "sha256": "488b7fc7b2051f4583501e6c06de8afb75a65a1de4f003cd8979f93c066b2b8d"
+ }
+}

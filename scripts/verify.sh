@@ -23,7 +23,8 @@ python3 scripts/eval_conversations.py --engines rules --strict --out "${TMPDIR:-
   2>&1 | grep -E "FAIL|by_config|passed" | tail -12
 
 echo "▶ Scenario engine tests + gold-set gates (offline rules engine)…"
-python3 backend/tests/test_scenario_engine.py
+# Hermetic: the test fakes the LLM, so a configured live server must not leak in.
+env -u OLLAMA_URL -u LLM_PROVIDER python3 backend/tests/test_scenario_engine.py
 python3 scripts/eval_scenarios.py --engines rules --split dev --strict --out "${TMPDIR:-/tmp}/drivelegal_scn" | tail -9
 
 echo "▶ LLM provider switch (offline unit tests)…"

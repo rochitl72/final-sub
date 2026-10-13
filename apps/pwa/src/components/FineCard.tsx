@@ -1,6 +1,7 @@
 import { Car, MapPin, Scale } from 'lucide-react';
 import type { DetailRow, FineCard as FineCardData } from '../lib/api';
 import { cx, inr, titleCase } from '../lib/format';
+import { ProvenanceStrip } from './Provenance';
 
 const HIGHLIGHT = ['Fine (1st offence)', 'First Offence'];
 
@@ -65,6 +66,8 @@ export function FineCard({ card, detailTable }: { card: FineCardData; detailTabl
           </dl>
         </div>
       )}
+
+      <ProvenanceStrip status={card.verify_status} note={card.verify_note} citation={card.citation} />
 
       {card.notes && <p className="mx-4 border-t border-navy-border py-3 text-sm italic leading-relaxed text-mist-soft">{card.notes}</p>}
     </div>
